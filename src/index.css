@@ -1,0 +1,698 @@
+@import './vibe-design/overrides.css';
+
+/* TEST PRINT / Layout v3 — full-width editorial grid */
+*, *::before, *::after { box-sizing: border-box; }
+html { min-width: 320px; }
+body { margin: 0; background: var(--color-bg); color: var(--color-text); }
+button, input { font: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+
+/* Remove the previous 1160px cap. The interface now fills the available viewport. */
+.app-shell { width: 100%; max-width: none; min-height: 100svh; margin: 0; padding: 0 clamp(12px, 1.55vw, 32px) clamp(16px, 1.5vw, 32px); }
+.site-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; min-height: 56px; border-bottom: 1px solid var(--color-border-strong); }
+.wordmark-wrap { display: flex; align-items: center; gap: 9px; font-weight: 900; letter-spacing: -.025em; }
+.accent-mark { display: block; width: 12px; height: 12px; background: var(--color-primary); transform: rotate(-15deg); }
+.wordmark { font-size: 16px; line-height: 1; }
+.header-index, .header-edition, .eyebrow, .hero-note, .experiment-number, .lab-heading-right > span, .sequence-label, .rail-control > span, .rail-control small, .sequence-readout, .sequence-bottom, .stage-footnote { margin: 0; font-size: 10px; font-weight: 800; letter-spacing: .09em; line-height: 1.3; }
+.header-index { justify-self: center; color: var(--color-text-2); }
+.header-divider { margin: 0 6px; color: var(--color-primary); }
+/* Keep COM at the original 10px/9px font size and color; enlarge only the dot. */
+.header-edition { justify-self: end; color: var(--color-text-2); display: inline-flex; align-items: center; gap: .2em; }
+.header-edition-dot { display: inline-block; font-size: 4em; line-height: .325; font-weight: inherit; letter-spacing: 0; }
+
+.hero-grid { display: grid; grid-template-columns: minmax(140px, .6fr) auto minmax(160px, .6fr); gap: 18px; align-items: center; padding: clamp(18px, 2vw, 34px) 0 clamp(18px, 2vw, 32px); }
+h1, h2 { margin: 0; font-family: var(--font-display); font-weight: 900; letter-spacing: -.075em; }
+h1 { position: relative; justify-self: center; white-space: nowrap; font-size: clamp(52px, 7.65vw, 156px); line-height: .78; }
+h1 em { color: var(--color-primary); font-style: normal; }
+.hero-asterisk { position: absolute; top: -.12em; right: -.50em; color: var(--color-primary); font-size: .27em; font-weight: 500; letter-spacing: 0; }
+.eyebrow { align-self: start; padding-top: 3px; }
+.hero-note { justify-self: end; text-align: right; align-self: end; color: var(--color-text-2); }
+
+.study-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border: 1px solid var(--color-border-strong); }
+.study-nav button { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: clamp(4px, .85vw, 14px); min-width: 0; min-height: 58px; padding: 10px clamp(9px, 1.1vw, 22px); border: 0; border-right: 1px solid var(--color-border-strong); background: #fff; color: #000; text-align: left; font-size: clamp(10px, .9vw, 14px); font-weight: 850; letter-spacing: -.02em; transition: background 130ms linear, color 130ms linear; }
+.study-nav button:last-child { border-right: 0; }
+.study-nav button:hover { background: var(--color-primary-weak); }
+.study-nav button.is-active, .study-nav button.is-active:hover { background: var(--color-primary); color: #fff; }
+.study-nav button > .tabular { font-size: 11px; font-weight: 700; color: var(--color-text-2); }
+.study-nav button.is-active > .tabular { color: #fff; }
+.study-nav .menu-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The experiment area is one continuous surface, without separate control cards. */
+.lab-layout {
+  display: grid;
+  grid-template-columns: clamp(164px, 15vw, 240px) minmax(0, 1fr);
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+.lab-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 94px;
+  padding: 16px 24px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+.lab-title-wrap { display: flex; gap: clamp(16px, 3vw, 52px); align-items: flex-end; }
+.experiment-number { padding-bottom: 5px; color: var(--color-primary); }
+h2 { font-size: clamp(37px, 4.15vw, 78px); line-height: .82; }
+.lab-heading-right { display: flex; align-items: center; padding-bottom: 2px; }
+.step-readout { color: var(--color-primary); font-size: clamp(15px, 1.5vw, 22px); font-weight: 850; white-space: nowrap; }
+.step-readout span { color: var(--color-text-2); font-size: .7em; }
+
+/* IMAGE SEQUENCE: text and a solid pie, not a boxed panel or a donut. */
+.sequence-control {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: clamp(18px, 1.7vw, 28px);
+  background: transparent;
+  border: 0;
+}
+.sequence-label { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.sequence-label strong { color: var(--color-primary); font-size: 25px; font-weight: 850; line-height: 1; }
+.sequence-wheel-wrap { flex: 1; min-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 17px; padding: 22px 0 65px; }
+.sequence-wheel { position: relative; width: min(100%, 176px); aspect-ratio: 1; cursor: crosshair; touch-action: none; user-select: none; }
+.wheel-graphic { display: block; width: 100%; height: 100%; }
+.wheel-base { fill: var(--color-surface); }
+.wheel-progress { fill: var(--color-accent); }
+.sequence-readout { color: var(--color-primary); font-size: 9px; text-align: center; white-space: nowrap; }
+
+/* The preview and the sliders share the same grey experiment surface. */
+.lab-preview { grid-column: 2; grid-row: 2; display: grid; grid-template-rows: minmax(420px, 1fr) auto; min-width: 0; }
+.preview-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: clamp(450px, calc(100svh - 440px), 870px);
+  padding: 44px 26px;
+  overflow: hidden;
+  isolation: isolate;
+  background: transparent;
+}
+.preview-tag { position: absolute; z-index: 2; top: 22px; left: 24px; color: var(--color-primary); font-size: 11px; font-weight: 800; letter-spacing: .09em; }
+.preview-actions { position: absolute; z-index: 5; top: 16px; right: 21px; }
+.preview-actions button { min-height: 40px; padding: 0 19px; border: 1px solid var(--color-primary); background: var(--color-primary); color: #fff !important; font-size: 12px; font-weight: 850; letter-spacing: .07em; transition: background 140ms linear, border-color 140ms linear; }
+.preview-actions button:hover { background: #000; border-color: #000; color: #fff !important; }
+.preview-actions button:disabled { opacity: .65; cursor: wait; }
+.cell-cluster { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; max-width: 100%; }
+.cluster-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+/* Each cell has an exact slot; there is never an unfinished last row.
+   The PNG is rasterized at the actual display size, not enlarged from a
+   low-resolution GPU layer (which previously used will-change: transform). */
+.cluster-cell { position: relative; display: grid; flex: 0 0 var(--cell-size); place-items: center; width: var(--cell-size); height: var(--cell-size); overflow: visible; }
+.cluster-cell .graphic-asset {
+  position: absolute;
+  left: calc(50% + var(--asset-offset-x, 0px));
+  top: calc(50% + var(--asset-offset-y, 0px));
+  /* grid의 자동 최소 크기가 PNG 원본 비율을 되살려 Y축 변형을 깨뜨리는 문제 방지 */
+  display: block;
+  width: var(--asset-width); height: var(--asset-height);
+  /* 고해상도 직접 렌더링을 유지한 채 실제 그림의 중심을 고정 */
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+  will-change: auto;
+  transition: none;
+}
+.graphic-asset img {
+  display: block; width: 100%; height: 100%;
+  max-width: none; max-height: none;
+  /* The element already has the source's aspect ratio × the user's X/Y scaling. */
+  object-fit: fill;
+  image-rendering: auto;
+  user-select: none; -webkit-user-drag: none;
+}
+.circle-graphic { display: grid; place-items: center; width: 100%; height: 100%; padding: 4px; gap: 4px; }
+.circle-dot { display: block; width: min(100%, 46px); aspect-ratio: 1; border: 1px solid #000; border-radius: 50%; background: var(--color-primary); }
+
+/* Only the slider lines and readouts remain – no backgrounds, borders or card cells. */
+.control-rail {
+  display: grid;
+  grid-template-columns: minmax(110px, .85fr) minmax(190px, 1.55fr) minmax(110px, .85fr) auto;
+  align-items: end;
+  gap: clamp(12px, 2vw, 30px);
+  min-width: 0;
+  padding: 5px clamp(15px, 2.2vw, 34px) 25px;
+  background: transparent;
+  border: 0;
+}
+.rail-control { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 3px 7px; min-width: 0; padding: 0; border: 0; background: transparent; }
+.rail-control > span { grid-column: 1; color: var(--color-text); line-height: 1.2; }
+.rail-control strong { grid-column: 2; color: var(--color-primary); font-size: 14px; text-align: right; line-height: 1.2; white-space: nowrap; }
+.rail-control small { grid-column: 1 / -1; color: var(--color-text-2); font-size: 9px; white-space: nowrap; }
+.rail-control input { grid-column: 1 / -1; width: 100%; height: 25px; margin: 4px 0 0; padding: 0; cursor: ew-resize; appearance: none; -webkit-appearance: none; border: 0; border-radius: 0; background-color: transparent; background-repeat: no-repeat; background-position: center; background-size: 100% 2px; }
+.form-control input, .density-control input { background-image: linear-gradient(to right, var(--color-primary) 0 var(--fill-end), #fff var(--fill-end) 100%); }
+.axis-control input { background-image: linear-gradient(to right, #fff 0 var(--fill-start), var(--color-primary) var(--fill-start) var(--fill-end), #fff var(--fill-end) 100%); }
+.rail-control input::-webkit-slider-runnable-track { height: 2px; background: transparent; }
+.rail-control input::-moz-range-track { height: 2px; background: transparent; }
+.rail-control input::-moz-range-progress { background: transparent; }
+.rail-control input::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--color-primary); }
+.rail-control input::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--color-primary); }
+.reset-trigger { align-self: end; min-width: 50px; margin-bottom: 16px; padding: 0; border: 0; background: transparent; color: var(--color-text); font-size: 12px; font-weight: 850; letter-spacing: .08em; white-space: nowrap; }
+.reset-trigger:hover { color: var(--color-primary); }
+
+@media (max-width: 1100px) {
+  .hero-grid { grid-template-columns: minmax(105px, .5fr) auto minmax(110px, .5fr); }
+  h1 { font-size: clamp(52px, 7.45vw, 104px); }
+  .lab-layout { grid-template-columns: 172px minmax(0, 1fr); }
+  .sequence-control { padding: 17px; }
+  .sequence-wheel { width: min(100%, 146px); }
+  .control-rail { gap: 13px; padding: 5px 18px 19px; }
+  .rail-control > span { font-size: 9px; }
+}
+@media (max-width: 760px) {
+  .app-shell { padding: 0 12px 12px; }
+  .site-header { grid-template-columns: 1fr auto; min-height: 52px; }
+  .header-index { display: none; }
+  .header-edition { font-size: 9px; }
+  .hero-grid { grid-template-columns: 1fr auto; gap: 10px; padding: 23px 0 20px; }
+  .hero-grid h1 { order: -1; grid-column: 1 / -1; justify-self: start; font-size: clamp(53px, 12.5vw, 92px); }
+  .eyebrow, .hero-note { font-size: 9px; }
+  .study-nav { grid-template-columns: repeat(6, minmax(138px, 1fr)); overflow-x: auto; overscroll-behavior-inline: contain; }
+  .study-nav button { min-height: 50px; padding: 10px 12px; }
+  .lab-layout { grid-template-columns: 1fr; }
+  .lab-heading { grid-column: 1; min-height: 83px; padding: 14px; }
+  .lab-title-wrap { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .experiment-number { padding: 0; font-size: 9px; }
+  h2 { font-size: clamp(29px, 9vw, 52px); }
+  .step-readout { font-size: 13px; }
+  .sequence-control { grid-column: 1; grid-row: 2; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 12px; min-height: 130px; padding: 14px 16px; }
+  .sequence-label { flex-direction: column; gap: 8px; }
+  .sequence-label strong { font-size: 24px; }
+  .sequence-wheel-wrap { grid-column: 2; grid-row: 1; min-height: 0; gap: 6px; padding: 0; }
+  .sequence-wheel { width: 103px; }
+  .sequence-readout { font-size: 8px; }
+  .lab-preview { grid-column: 1; grid-row: 3; }
+  .preview-stage { min-height: clamp(335px, 52svh, 600px); padding: 44px 14px 34px; }
+  .preview-tag { top: 16px; left: 14px; font-size: 9px; }
+  .preview-actions { top: 10px; right: 12px; }
+  .preview-actions button { min-height: 34px; padding: 0 12px; font-size: 10px; }
+  .control-rail { grid-template-columns: 1fr 1fr; column-gap: 24px; row-gap: 17px; padding: 12px 16px 21px; }
+  .axis-control { grid-column: 1 / -1; grid-row: 2; }
+  .density-control { grid-column: 2; grid-row: 1; }
+  .form-control { grid-column: 1; grid-row: 1; }
+  .reset-trigger { grid-column: 1 / -1; grid-row: 3; justify-self: end; margin: 0; }
+}
+@media (max-width: 400px) {
+  .hero-grid h1 { font-size: 12vw; }
+  .study-nav { grid-template-columns: repeat(6, minmax(130px, 1fr)); }
+  .sequence-label { font-size: 9px; }
+  .rail-control > span { font-size: 8px; }
+  .rail-control strong { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cluster-cell .graphic-asset, .study-nav button, .preview-actions button { transition: none; }
+}
+
+/* Keep the inactive experiment mounted so its state and ResizeObserver survive tab switches. */
+.lab-layout[hidden] { display: none !important; }
+
+
+.hero-title-image {
+  display: block;
+  width: clamp(260px, 37vw, 720px);
+  max-width: 100%;
+  height: auto;
+}
+.study-name-image {
+  display: block;
+  width: var(--study-name-width, 6em);
+  max-width: 100%;
+  height: auto;
+}
+.heading-menu-index {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: right;
+}
+@media (max-width: 760px) {
+  .hero-title-image { width: min(100%, 72vw); }
+}
+
+/* TITLE PNG SPACING — reserve the vertical rhythm of the former text titles.
+   No PNG width, aspect ratio, navigation or control sizing is modified. */
+.hero-grid {
+  padding-top: clamp(28px, 3vw, 48px);
+  padding-bottom: clamp(28px, 3vw, 48px);
+}
+.hero-grid h1 {
+  display: flex;
+  align-items: center;
+  min-height: clamp(41px, 6vw, 122px);
+}
+.lab-heading {
+  min-height: clamp(110px, 9vw, 142px);
+  padding-top: clamp(22px, 2vw, 30px);
+  padding-bottom: clamp(22px, 2vw, 30px);
+}
+.lab-heading h2 {
+  display: flex;
+  align-items: center;
+  min-height: clamp(30px, 3.4vw, 64px);
+}
+
+@media (max-width: 760px) {
+  .hero-grid { padding-top: 26px; padding-bottom: 28px; }
+  .hero-grid h1 { min-height: clamp(42px, 9.75vw, 72px); }
+  .lab-heading { min-height: 104px; padding: 18px 14px 20px; }
+  .lab-heading h2 { min-height: clamp(24px, 7.4vw, 43px); }
+}
+
+
+/* 2026-10 — integrated grey studio: the detached white study heading is gone.
+   All index PNGs use the same reference height as the reduced CHARACTERISTIC title.
+   Their width remains intrinsic, so their original aspect ratios are never stretched. */
+.hero-grid {
+  padding-top: clamp(36px, 4.1vw, 66px);
+  padding-bottom: clamp(36px, 4.1vw, 66px);
+}
+.lab-layout {
+  grid-template-rows: minmax(0, auto);
+}
+.sequence-control {
+  grid-column: 1;
+  grid-row: 1;
+  padding: clamp(24px, 2.5vw, 38px) clamp(16px, 1.6vw, 27px) 16px;
+}
+.lab-preview {
+  grid-column: 2;
+  grid-row: 1;
+}
+.study-inline-title {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: clamp(11px, 1.3vw, 18px);
+  width: max-content;
+  max-width: calc(100vw - 90px);
+  margin: 0 0 clamp(19px, 2.1vw, 30px);
+  position: relative;
+  z-index: 3;
+}
+.study-inline-number {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+  font-size: 25px;
+  font-weight: 850;
+  line-height: 1;
+}
+.study-inline-name {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  line-height: 1;
+}
+.study-inline-name .study-name-image {
+  display: block;
+  width: auto;
+  height: clamp(24px, 2.65vw, 36px);
+  max-width: calc(100vw - 120px);
+  max-height: none;
+  object-fit: contain;
+  object-position: left center;
+}
+.sequence-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: clamp(12px, 1.4vw, 20px);
+}
+.sequence-label > span { white-space: nowrap; }
+.sequence-label strong {
+  display: block;
+  color: var(--color-primary);
+  font-size: 25px;
+  font-weight: 850;
+  line-height: 1;
+}
+.sequence-wheel-wrap {
+  flex: 1;
+  justify-content: center;
+  padding-top: clamp(48px, 6vw, 92px);
+  padding-bottom: clamp(20px, 3vw, 48px);
+}
+@media (max-width: 760px) {
+  .hero-grid { padding-top: 32px; padding-bottom: 34px; }
+  .lab-layout { grid-template-columns: minmax(0, 1fr); }
+  .sequence-control {
+    grid-column: 1;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 114px;
+    grid-template-rows: auto auto;
+    align-items: start;
+    gap: 18px 10px;
+    padding: 20px 16px 18px;
+    min-height: 0;
+  }
+  .study-inline-title {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    margin-bottom: 0;
+    gap: 12px;
+  }
+  .study-inline-number { font-size: 24px; }
+  .study-inline-name .study-name-image {
+    height: 27px;
+    max-width: calc(100vw - 102px);
+  }
+  .sequence-label {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    gap: 14px;
+  }
+  .sequence-label strong { font-size: 24px; }
+  .sequence-wheel-wrap {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: center;
+    align-self: center;
+    min-height: 0;
+    padding: 0;
+    gap: 7px;
+  }
+  .sequence-wheel { width: min(103px, 100%); }
+  .lab-preview { grid-column: 1; grid-row: 2; }
+}
+
+
+/* October refinement: distinguish the active menu from the frame number. */
+.study-inline-number { color: #ABFFEB; }
+.sequence-label { gap: 0; }
+.sequence-wheel-wrap {
+  justify-content: flex-start;
+  min-height: 220px;
+  padding-top: clamp(20px, 2.7vw, 42px);
+  padding-bottom: clamp(16px, 2vw, 30px);
+  gap: clamp(12px, 1.3vw, 19px);
+}
+.sequence-value {
+  display: block;
+  color: #000000;
+  font-size: 12.5px;
+  line-height: 1;
+  font-weight: 850;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .sequence-wheel-wrap {
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    gap: 10px;
+  }
+  .sequence-label { gap: 0; }
+  .sequence-value { font-size: 12px; }
+}
+
+
+/* 2026-10-20: shorter editorial top, without shrinking the lettering ratio. */
+.site-header { min-height: 46px; }
+.hero-grid {
+  padding-top: clamp(12px, 1.55vw, 24px);
+  padding-bottom: clamp(12px, 1.55vw, 24px);
+}
+.hero-grid h1 { min-height: 0; }
+.hero-title-image { width: clamp(245px, 33vw, 640px); }
+.study-nav button {
+  min-height: 42px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* A compact export format switch: no extra boxes around the experiment. */
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.preview-actions .print-background-options {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.preview-actions .print-mode-button {
+  min-height: 29px;
+  border: 1px solid transparent;
+  padding: 0 5px;
+  background: transparent;
+  color: var(--color-text) !important;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .045em;
+}
+.preview-actions .print-mode-button[aria-pressed="true"] {
+  border-bottom: 2px solid var(--color-primary);
+  color: var(--color-primary) !important;
+}
+.preview-actions .print-mode-button:hover,
+.preview-actions .print-mode-button:focus-visible {
+  background: transparent;
+  border-color: var(--color-primary);
+  color: var(--color-primary) !important;
+}
+.preview-actions .print-export-button {
+  color: #fff !important;
+  padding: 0 16px;
+}
+@media (max-width: 760px) {
+  .site-header { min-height: 45px; }
+  .hero-grid { padding-top: 12px; padding-bottom: 13px; }
+  .hero-grid .hero-title-image { width: min(100%, 69vw); }
+  .study-nav button { min-height: 43px; padding-top: 7px; padding-bottom: 7px; }
+  .preview-actions { top: 10px; right: 9px; gap: 5px; }
+  .preview-actions .print-background-options { gap: 0; }
+  .preview-actions .print-mode-button { min-height: 28px; padding: 0 4px; font-size: 7.5px; }
+  .preview-actions .print-export-button { padding: 0 9px; font-size: 9px; }
+}
+
+
+/* October adjustment: enlarge only the vertical breathing room of the hero,
+   keeping the TEST PRINT lettering itself exactly the same size. */
+.hero-grid {
+  padding-top: clamp(21px, 2.7125vw, 42px);
+  padding-bottom: clamp(21px, 2.7125vw, 42px);
+}
+
+/* Sequence helper and fraction-style readout follow the same typography as
+   the other adjustment bars, while the mint study number stays distinct. */
+.sequence-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+.sequence-label > span { font-size: 10px; color: var(--color-text); }
+.sequence-label .sequence-instruction {
+  font-size: 9px;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: .09em;
+  color: var(--color-text-2);
+  white-space: nowrap;
+}
+.sequence-value {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* PRINT remains a single visible action. The format choices appear below it
+   on hover, keyboard focus or touch tap. No gap between trigger and submenu. */
+.preview-actions { display: flex; align-items: flex-start; }
+.preview-actions .print-dropdown {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.preview-actions .print-dropdown-menu {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: 100%;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 160px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-surface-2);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.preview-actions .print-dropdown:hover .print-dropdown-menu,
+.preview-actions .print-dropdown:focus-within .print-dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.preview-actions .print-dropdown-menu .print-format-button {
+  display: block;
+  width: 100%;
+  min-height: 35px;
+  padding: 7px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-surface-2);
+  color: var(--color-text) !important;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .06em;
+}
+.preview-actions .print-dropdown-menu .print-format-button:last-child { border-bottom: 0; }
+.preview-actions .print-dropdown-menu .print-format-button[aria-pressed="true"] {
+  color: var(--color-primary) !important;
+}
+.preview-actions .print-dropdown-menu .print-format-button:hover,
+.preview-actions .print-dropdown-menu .print-format-button:focus-visible {
+  background: var(--color-primary);
+  color: #fff !important;
+}
+
+@media (max-width: 760px) {
+  .hero-grid { padding-top: 21px; padding-bottom: 23px; }
+  .sequence-label .sequence-instruction { font-size: 9px; }
+  .sequence-value { font-size: 14px; }
+  .preview-actions .print-dropdown-menu { min-width: 144px; }
+}
+@media (max-width: 400px) {
+  .sequence-value { font-size: 12px; }
+}
+
+/* Keep the FONT SIZE label on one line even in narrow control columns. */
+.font-size-control > span { white-space: nowrap; }
+
+
+/* Equal, deliberately small gutters on left, right and bottom.
+   Stretch the grey studio to the bottom gutter instead of leaving a tall white
+   strip below it on screens taller than the content. */
+.app-shell {
+  --page-gutter: clamp(12px, 1.55vw, 32px);
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  padding-left: var(--page-gutter);
+  padding-right: var(--page-gutter);
+  padding-bottom: var(--page-gutter);
+}
+.app-shell > main {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.app-shell main > .lab-layout:not([hidden]) {
+  flex: 1 0 auto;
+}
+@media (max-width: 760px) {
+  .app-shell { --page-gutter: 12px; }
+}
+
+
+/* Keep the graphic sliders to the left and reserve a clearly separated right
+   edge for the RESET / RANDOM actions. RANDOM matches the PRINT button. */
+.control-rail {
+  grid-template-columns: minmax(88px, .8fr) minmax(165px, 1.3fr) minmax(95px, .8fr) minmax(160px, auto);
+  column-gap: clamp(9px, 1vw, 18px);
+  padding-left: clamp(12px, 1.2vw, 22px);
+  padding-right: clamp(26px, 3.6vw, 76px);
+}
+.graphic-actions { grid-column: 4; display: flex; align-items: center; justify-content: flex-end; align-self: end; gap: clamp(16px, 1.75vw, 28px); white-space: nowrap; }
+.graphic-actions .reset-trigger { margin: 0; }
+.random-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 17px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .07em;
+  white-space: nowrap;
+}
+.random-trigger:hover { background: #000; border-color: #000; color: #fff; }
+.random-trigger:focus-visible { outline: 2px solid #000; outline-offset: 3px; }
+@media (max-width: 1100px) {
+  .control-rail { grid-template-columns: minmax(84px, .85fr) minmax(135px, 1.35fr) minmax(84px, .85fr) auto; padding-right: 20px; }
+  .graphic-actions { gap: 12px; }
+  .random-trigger { padding: 0 11px; min-height: 36px; font-size: 10px; }
+}
+@media (max-width: 760px) {
+  .control-rail { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 12px 16px 21px; }
+  .graphic-actions { grid-column: 1 / -1; grid-row: 3; justify-self: end; gap: 22px; }
+}
+
+
+/* Full-width control rail: reclaim the unused area below IMAGE SEQUENCE.
+   Preview images remain in their original right-hand column. */
+.lab-layout { --lab-sidebar-size: clamp(164px, 15vw, 240px); }
+.control-rail {
+  width: calc(100% + var(--lab-sidebar-size));
+  margin-left: calc(-1 * var(--lab-sidebar-size));
+  grid-template-columns: minmax(120px, 1fr) minmax(190px, 1.28fr) minmax(120px, 1fr) minmax(180px, auto);
+  align-items: end;
+  column-gap: clamp(18px, 2.3vw, 44px);
+  padding: 8px clamp(12px, 1.5vw, 26px) 24px;
+}
+.graphic-actions {
+  align-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(26px, 3vw, 52px);
+}
+.graphic-actions .reset-trigger,
+.graphic-actions .random-trigger {
+  display: inline-flex;
+  min-height: 40px;
+  margin: 0;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .lab-layout { --lab-sidebar-size: 172px; }
+  .control-rail {
+    grid-template-columns: minmax(92px, 1fr) minmax(165px, 1.25fr) minmax(92px, 1fr) minmax(150px, auto);
+    column-gap: clamp(12px, 1.7vw, 22px);
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .graphic-actions { gap: clamp(18px, 2vw, 32px); }
+}
+@media (max-width: 760px) {
+  .lab-layout { --lab-sidebar-size: 0px; }
+  .control-rail {
+    width: 100%;
+    margin-left: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 22px;
+    row-gap: 18px;
+    padding: 12px 14px 21px;
+  }
+  .graphic-actions { grid-column: 1 / -1; grid-row: 3; justify-self: end; gap: 30px; }
+}

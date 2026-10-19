@@ -1,0 +1,22 @@
+:root:root:root {
+  --color-primary: #001EF7;
+  --color-primary-fg: #FFFFFF;
+  --color-primary-strong: #001EF7;
+  --color-primary-weak: #ABFFEB;
+  --color-accent: #ABFFEB;
+  --color-accent-fg: #000000;
+  --color-surface-2: #B4BDCC;
+  --color-muted: #B4BDCC;
+  --color-border: #B4BDCC;
+  --color-border-strong: #000000;
+  --color-bg: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-text: #000000;
+  --color-text-2: #4D5561;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-pill: 0;
+  --shadow-sm: none;
+  --shadow-md: none;
+}

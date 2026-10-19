@@ -1,0 +1,420 @@
+/* FONT / part of the existing continuous gray laboratory surface. No control cards. */
+.font-layout[hidden] { display: none !important; }
+.font-axis-panel {
+  grid-column: 1; grid-row: 2; position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 0; padding: 24px 14px 20px; gap: 8px;
+}
+.font-axis-title { align-self: flex-start; font-size: 10px; line-height: 1.3; letter-spacing: .07em; font-weight: 850; }
+.font-axis-value { align-self: flex-start; font-size: 17px; color: var(--color-primary); }
+.font-axis-vertical { position: relative; flex: 1; min-height: 270px; max-height: 480px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 22px 0; }
+.font-axis-vertical > span { position: absolute; color: var(--color-primary); font-size: 10px; font-weight: 850; }
+.font-axis-top { top: 0; }
+.font-axis-mid { top: 50%; left: calc(50% + 28px); transform: translateY(-50%); }
+.font-axis-bottom { bottom: 0; }
+.font-axis-vertical input {
+  height: 100%; min-height: 205px; max-height: 420px; width: 30px;
+  padding: 0; margin: 0; cursor: ns-resize; border: none; background: transparent;
+  writing-mode: vertical-lr; direction: rtl; accent-color: var(--color-primary);
+}
+.font-axis-help { font-size: 9px; line-height: 1.6; font-weight: 750; color: var(--color-text-2); align-self: flex-start; }
+.font-preview-column { grid-column: 2; grid-row: 2; min-width: 0; display: grid; grid-template-rows: minmax(420px,1fr) auto; }
+.font-preview-stage {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  min-width: 0; min-height: clamp(450px, calc(100svh - 440px), 870px);
+  padding: 52px 30px 58px; overflow: hidden; isolation: isolate; cursor: text;
+}
+.font-keyboard-input {
+  position: absolute; top: 16px; left: 15px; z-index: -1;
+  width: 1px; height: 1px; padding: 0; border: 0; opacity: 0;
+  pointer-events: none; resize: none;
+}
+.font-composition { position: relative; flex: 0 0 auto; z-index: 1; pointer-events: none; }
+.font-glyph { position: absolute; display: block; overflow: visible; }
+.font-glyph img { display: block; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: fill; image-rendering: auto; }
+.font-missing-glyph { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border: 1px dashed var(--color-primary); color: var(--color-primary); font-size: 18px; font-weight: 800; }
+.font-empty-prompt { position: absolute; display: flex; flex-direction: column; gap: 9px; align-items: center; text-align: center; color: var(--color-primary); letter-spacing: .08em; pointer-events: none; }
+.font-empty-prompt strong { font-size: clamp(22px, 3vw, 50px); }
+.font-empty-prompt span { font-size: 10px; font-weight: 750; }
+.font-control-rail {
+  display: grid; grid-template-columns: minmax(120px,1fr) minmax(145px,1.15fr) minmax(145px,1.15fr) minmax(154px,1.05fr) auto;
+  align-items: end; gap: clamp(12px, 1.75vw, 26px);
+  padding: 5px clamp(15px, 2.2vw, 34px) 25px;
+  background: transparent; border: 0;
+}
+.font-control-rail .rail-control { min-width: 0; }
+.font-size-control input { background-image: linear-gradient(to right, var(--color-primary) 0 var(--fill-end), #fff var(--fill-end) 100%); }
+.font-tracking-control input, .font-leading-control input {
+  background-image: linear-gradient(to right,#fff 0 var(--fill-start),var(--color-primary) var(--fill-start) var(--fill-end),#fff var(--fill-end) 100%);
+}
+.font-align-control { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; min-width: 0; padding: 0; margin: 0; border: 0; }
+.font-align-control legend { display: block; margin: 0 0 6px; padding: 0; font-size: 10px; font-weight: 850; letter-spacing: .09em; }
+.font-align-options { display: flex; align-items: center; gap: 5px; }
+.font-align-options button { flex: 1; padding: 7px 4px; min-width: 0; border: 1px solid var(--color-primary); background: transparent; color: var(--color-primary); font-size: 9px; font-weight: 850; }
+.font-align-options button.is-selected { color: #fff; background: var(--color-primary); }
+.font-align-options button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.font-align-control small { display: block; font-size: 9px; color: var(--color-text-2); font-weight: 750; white-space: nowrap; }
+.font-control-rail .reset-trigger { margin-bottom: 16px; }
+@media (max-width: 1180px) {
+  .font-control-rail { grid-template-columns: 1fr 1fr 1fr; column-gap: 16px; row-gap: 17px; }
+  .font-align-control { grid-column: 1 / 3; }
+  .font-control-rail .reset-trigger { grid-column: 3; grid-row: 2; justify-self: end; }
+}
+@media (max-width: 760px) {
+  .font-axis-panel { grid-column: 1; grid-row: 2; min-height: 174px; padding: 13px 15px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto; }
+  .font-axis-title { grid-column: 1; grid-row: 1; }
+  .font-axis-value { grid-column: 1; grid-row: 2; align-self: center; }
+  .font-axis-help { grid-column: 1; grid-row: 3; }
+  .font-axis-vertical { grid-column: 2; grid-row: 1 / 4; min-height: 142px; max-height: 170px; width: 76px; padding: 17px 0; }
+  .font-axis-vertical input { height: 100%; min-height: 82px; max-height: 120px; }
+  .font-axis-mid { left: calc(50% + 20px); }
+  .font-preview-column { grid-column: 1; grid-row: 3; }
+  .font-preview-stage { min-height: clamp(335px, 52svh, 600px); padding: 44px 14px 34px; }
+  .font-control-rail { grid-template-columns: 1fr 1fr; column-gap: 22px; row-gap: 18px; padding: 12px 16px 21px; }
+  .font-size-control { grid-column: 1; grid-row: 1; }
+  .font-tracking-control { grid-column: 2; grid-row: 1; }
+  .font-leading-control { grid-column: 1; grid-row: 2; }
+  .font-align-control { grid-column: 2; grid-row: 2; }
+  .font-control-rail .reset-trigger { grid-column: 1 / -1; grid-row: 3; justify-self: end; margin: 0; }
+  .font-align-options { gap: 2px; }
+  .font-align-options button { font-size: 8px; }
+}
+
+
+.font-empty-prompt-image {
+  display: block;
+  width: clamp(220px, 32vw, 520px);
+  max-width: 100%;
+  height: auto;
+}
+.font-control-rail .reset-trigger {
+  margin-bottom: 28px;
+}
+@media (max-width: 760px) {
+  .font-control-rail .reset-trigger {
+    margin-bottom: 0;
+  }
+}
+
+/* Restore the former TYPE TO PRINT text area's vertical breathing room.
+   The lettering PNG itself keeps its existing width and native aspect ratio. */
+.font-empty-prompt {
+  min-height: clamp(92px, 9vw, 148px);
+  justify-content: center;
+  gap: clamp(12px, 1.1vw, 18px);
+}
+@media (max-width: 760px) {
+  .font-empty-prompt { min-height: 94px; gap: 12px; }
+}
+
+
+/* FONT uses the same compact grey header as the graphic studies. */
+.font-axis-panel {
+  grid-column: 1;
+  grid-row: 1;
+  padding: clamp(24px, 2.5vw, 38px) clamp(16px, 1.6vw, 27px) 20px;
+  align-items: flex-start;
+}
+.font-study-inline-title {
+  align-self: flex-start;
+  margin-bottom: clamp(20px, 2.2vw, 32px);
+}
+.font-axis-vertical { align-self: stretch; }
+.font-preview-column { grid-column: 2; grid-row: 1; }
+@media (max-width: 760px) {
+  .font-axis-panel {
+    grid-column: 1;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 85px;
+    grid-template-rows: auto auto auto auto;
+    min-height: 190px;
+    gap: 7px 8px;
+    padding: 20px 16px 16px;
+  }
+  .font-study-inline-title {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    margin-bottom: 10px;
+  }
+  .font-axis-title { grid-column: 1; grid-row: 2; }
+  .font-axis-value { grid-column: 1; grid-row: 3; align-self: start; }
+  .font-axis-help { grid-column: 1; grid-row: 4; }
+  .font-axis-vertical {
+    grid-column: 2;
+    grid-row: 2 / 5;
+    width: 76px;
+    min-height: 145px;
+    max-height: 180px;
+    align-self: center;
+    padding: 17px 0;
+  }
+  .font-preview-column { grid-column: 1; grid-row: 2; }
+}
+
+
+/* Compact FONT's initial height; grow when typed lines need extra space. */
+.font-axis-panel {
+  padding-top: 19px;
+  padding-bottom: 12px;
+  gap: 6px;
+}
+.font-study-inline-title { margin-bottom: clamp(10px, 1.2vw, 18px); }
+.font-axis-vertical {
+  flex: 0 0 auto;
+  height: clamp(155px, 23svh, 235px);
+  min-height: 0;
+  max-height: none;
+  padding: 16px 0;
+}
+.font-axis-vertical input {
+  min-height: 115px;
+  max-height: 205px;
+}
+.font-preview-column { grid-template-rows: minmax(0, auto) auto; }
+.font-preview-stage {
+  min-height: max(clamp(235px, calc(100svh - 480px), 435px), var(--font-content-min-height, 0px));
+  padding-top: 42px;
+  padding-bottom: 42px;
+}
+@media (max-width: 760px) {
+  .font-axis-panel {
+    min-height: 0;
+    padding-top: 14px;
+    padding-bottom: 10px;
+  }
+  .font-study-inline-title { margin-bottom: 8px; }
+  .font-axis-vertical {
+    height: 128px;
+    min-height: 0;
+    max-height: 128px;
+    padding: 12px 0;
+  }
+  .font-axis-vertical input {
+    min-height: 90px;
+    max-height: 104px;
+  }
+  .font-preview-stage {
+    min-height: max(clamp(245px, 42svh, 380px), var(--font-content-min-height, 0px));
+    padding-top: 42px;
+    padding-bottom: 38px;
+  }
+}
+
+
+/* 2026-10-20: FONT stage stays close in height to the other studies,
+   while many lines still expand the page for scrolling. */
+.font-preview-column { grid-template-rows: minmax(0, auto) auto; }
+.font-preview-stage {
+  min-height: max(clamp(410px, calc(100svh - 410px), 670px), var(--font-content-min-height, 0px));
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+.font-axis-panel { gap: 8px; }
+.font-axis-vertical {
+  flex: 0 0 auto;
+  align-self: center;
+  height: clamp(235px, 29svh, 335px);
+  width: 100%;
+  min-height: 0;
+  max-height: none;
+  padding: 17px 0;
+}
+.font-axis-vertical input {
+  height: 100%;
+  min-height: 180px;
+  max-height: 298px;
+}
+.font-axis-value {
+  align-self: center;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--color-primary);
+  font-weight: 850;
+  text-align: center;
+}
+.font-axis-help { margin-top: 3px; }
+@media (max-width: 760px) {
+  .font-preview-stage {
+    min-height: max(clamp(350px, 49svh, 515px), var(--font-content-min-height, 0px));
+    padding-top: 42px;
+    padding-bottom: 42px;
+  }
+  .font-axis-panel {
+    grid-template-rows: auto auto auto auto auto;
+    grid-template-columns: minmax(0, 1fr) 86px;
+    padding-bottom: 14px;
+  }
+  .font-axis-title { grid-column: 1; grid-row: 2; }
+  .font-axis-vertical {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    align-self: center;
+    height: 190px;
+    min-height: 0;
+    max-height: none;
+    padding: 12px 0;
+  }
+  .font-axis-vertical input { min-height: 145px; max-height: 170px; }
+  .font-axis-value { grid-column: 2; grid-row: 4; align-self: start; }
+  .font-axis-help { grid-column: 1; grid-row: 3 / 5; align-self: end; }
+}
+
+
+/* Editing feedback: the type prompt disappears when the invisible real
+   textarea receives focus, and a cobalt caret blinks at the insertion point. */
+.font-blinking-caret {
+  position: absolute;
+  z-index: 3;
+  display: block;
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--color-primary, #001EF7);
+  pointer-events: none;
+  animation: font-caret-blink 1s steps(1, end) infinite;
+}
+@keyframes font-caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .font-blinking-caret { animation: none; opacity: 1; }
+}
+
+
+/* FONT bottom rail: ALIGN | FONT SIZE | TRACKING | LEADING | RESET RANDOM.
+   Keep the original line-only lab controls; no extra cards or blocks. */
+.font-control-rail {
+  grid-template-columns: minmax(154px, 1.2fr) minmax(112px, .9fr) minmax(118px, 1fr) minmax(118px, 1fr) auto;
+  column-gap: clamp(9px, 1.1vw, 18px);
+  padding-left: clamp(12px, 1.35vw, 22px);
+  padding-right: clamp(12px, 1.35vw, 22px);
+}
+.font-align-control { grid-column: 1; grid-row: 1; }
+.font-size-control { grid-column: 2; grid-row: 1; }
+.font-tracking-control { grid-column: 3; grid-row: 1; }
+.font-leading-control { grid-column: 4; grid-row: 1; }
+.font-actions {
+  grid-column: 5;
+  grid-row: 1;
+  display: flex;
+  align-self: end;
+  justify-self: end;
+  align-items: center;
+  gap: clamp(8px, 1vw, 16px);
+  padding-bottom: 16px;
+  white-space: nowrap;
+}
+.font-control-rail .font-actions .reset-trigger {
+  align-self: auto;
+  min-width: 0;
+  margin: 0;
+}
+.font-control-rail .random-trigger:hover { color: var(--color-primary); }
+@media (max-width: 1180px) {
+  .font-control-rail {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 14px;
+    row-gap: 12px;
+  }
+  .font-align-control { grid-column: 1; grid-row: 1; }
+  .font-size-control { grid-column: 2; grid-row: 1; }
+  .font-tracking-control { grid-column: 3; grid-row: 1; }
+  .font-leading-control { grid-column: 4; grid-row: 1; }
+  .font-actions { grid-column: 3 / 5; grid-row: 2; justify-self: end; padding-bottom: 0; }
+}
+@media (max-width: 760px) {
+  .font-control-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 18px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .font-align-control { grid-column: 1; grid-row: 1; }
+  .font-size-control { grid-column: 2; grid-row: 1; }
+  .font-tracking-control { grid-column: 1; grid-row: 2; }
+  .font-leading-control { grid-column: 2; grid-row: 2; }
+  .font-actions { grid-column: 1 / -1; grid-row: 3; padding-bottom: 0; }
+}
+
+
+/* PNG text selection: mint is painted behind the transparent glyph artwork.
+   The highlight is UI-only and is never included in PRINT. */
+.font-selection-block {
+  position: absolute;
+  z-index: 0;
+  display: block;
+  background: #ABFFEB;
+  pointer-events: none;
+}
+.font-composition .font-glyph { z-index: 1; }
+/* Keep the controls left-aligned and provide more horizontal space near actions. */
+.font-control-rail {
+  grid-template-columns: minmax(110px, .85fr) minmax(90px, .76fr) minmax(96px, .88fr) minmax(96px, .88fr) minmax(165px,auto);
+  column-gap: clamp(6px, .65vw, 12px);
+  padding-left: 12px;
+  padding-right: clamp(28px, 3.7vw, 78px);
+}
+.font-actions { gap: clamp(17px, 1.8vw, 29px); padding-bottom: 0; }
+.font-control-rail .random-trigger { min-height: 40px; margin: 0; }
+@media (max-width: 1180px) {
+  .font-control-rail { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-right: 18px; }
+  .font-actions { grid-column: 3 / 5; grid-row: 2; }
+}
+@media (max-width: 760px) {
+  .font-control-rail { grid-template-columns: repeat(2, minmax(0,1fr)); padding-left: 14px; padding-right: 14px; }
+  .font-actions { grid-column: 1 / -1; grid-row: 3; }
+}
+
+
+/* Let FONT controls use the gray studio all the way from the left edge.
+   They share the same full-width alignment as the other studies. */
+.font-control-rail {
+  width: calc(100% + var(--lab-sidebar-size));
+  margin-left: calc(-1 * var(--lab-sidebar-size));
+  grid-template-columns: minmax(150px, 1.1fr) minmax(115px, .95fr) minmax(132px, 1fr) minmax(132px, 1fr) minmax(185px, auto);
+  column-gap: clamp(18px, 1.9vw, 38px);
+  padding: 8px clamp(12px, 1.5vw, 26px) 24px;
+  align-items: end;
+}
+.font-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  align-self: end;
+  justify-self: end;
+  gap: clamp(26px, 3vw, 52px);
+  padding: 0;
+}
+.font-control-rail .font-actions .reset-trigger,
+.font-control-rail .font-actions .random-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin: 0;
+  line-height: 1;
+  vertical-align: middle;
+  font-size: 12px;
+}
+@media (max-width: 1180px) {
+  .font-control-rail {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: clamp(14px, 2vw, 28px);
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .font-actions { grid-column: 3 / 5; grid-row: 2; gap: 30px; }
+}
+@media (max-width: 760px) {
+  .font-control-rail {
+    width: 100%;
+    margin-left: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 22px;
+    row-gap: 18px;
+    padding: 12px 14px 21px;
+  }
+  .font-actions { grid-column: 1 / -1; grid-row: 3; gap: 30px; }
+}
