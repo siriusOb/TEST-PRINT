@@ -107,6 +107,86 @@ function visibleImageBounds(image: HTMLImageElement): DrawBounds {
   }
 }
 
+// One shared image cache survives every React menu/frame change. Every URL is
+// downloaded, decoded and measured at most once; multiple requests reuse the
+// same in-flight Promise instead of starting a second image download.
+const graphicAssetCache = new Map<string, AssetResult>()
+const graphicAssetRequests = new Map<string, Promise<AssetResult>>()
+
+function preloadGraphicAsset(url: string, priority: 'high' | 'low' = 'low'): Promise<AssetResult> {
+  const cached = graphicAssetCache.get(url)
+  if (cached) return Promise.resolve(cached)
+  const pending = graphicAssetRequests.get(url)
+  if (pending) return pending
+
+  const request = new Promise<AssetResult>((resolve) => {
+    const image = new Image()
+    image.decoding = 'async'
+    image.fetchPriority = priority
+    let settled = false
+    let decoding = false
+    const finish = (result: AssetResult) => {
+      if (settled) return
+      settled = true
+      image.onload = null
+      image.onerror = null
+      graphicAssetCache.set(url, result)
+      resolve(result)
+    }
+    const onLoaded = () => {
+      if (decoding || settled) return
+      if (!image.naturalWidth || !image.naturalHeight) {
+        finish({ status: 'missing', url })
+        return
+      }
+      decoding = true
+      // Decode off the main render path, so switching to this image doesn't
+      // briefly expose an empty <img> while the browser decodes the PNG.
+      void image.decode().catch(() => undefined).then(() => {
+        finish({
+          status: 'ready', url,
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+          bounds: visibleImageBounds(image),
+        })
+      })
+    }
+    image.onload = onLoaded
+    image.onerror = () => finish({ status: 'missing', url })
+    image.src = url
+    if (image.complete && image.naturalWidth > 0) onLoaded()
+  })
+  graphicAssetRequests.set(url, request)
+  void request.then(() => graphicAssetRequests.delete(url))
+  return request
+}
+
+function preloadDecorativeImage(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const image = new Image()
+    image.decoding = 'async'
+    image.fetchPriority = 'low'
+    let settled = false
+    let decoding = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      image.onload = null
+      image.onerror = null
+      resolve()
+    }
+    const onLoaded = () => {
+      if (decoding || settled) return
+      decoding = true
+      void image.decode().catch(() => undefined).then(finish)
+    }
+    image.onload = onLoaded
+    image.onerror = finish
+    image.src = url
+    if (image.complete && image.naturalWidth > 0) onLoaded()
+  })
+}
+
 function drawFallback(context: CanvasRenderingContext2D, count: number, cell: number, primary: string) {
   const columns = Math.ceil(Math.sqrt(count))
   const rows = Math.ceil(count / columns)
@@ -139,17 +219,23 @@ export default function App() {
   const stageRef = useRef<HTMLDivElement>(null)
   const [stageSize, setStageSize] = useState({ width: 1050, height: 520 })
   const [lastReadyAssets, setLastReadyAssets] = useState<Partial<Record<MenuName, ReadyAsset>>>({})
-  // Results are stored per URL, not in one mutable slot. Switching studies
-  // always resolves the currently selected frame without another wheel click.
+  // Keep the previous artwork visible until the next decoded PNG is ready.
+  // This avoids the blank gray frame when switching to an uncached menu.
+  const lastDisplayedAsset = useRef<ReadyAsset | undefined>(undefined)
   const [assetResults, setAssetResults] = useState<Record<string, AssetResult>>({})
 
   const frameAsset = getFrameAsset(graphicMenu, sequence)
-  const currentResult = assetResults[frameAsset.url]
+  const currentResult = assetResults[frameAsset.url] ?? graphicAssetCache.get(frameAsset.url)
   const imageStatus = currentResult?.status ?? 'loading'
-  const displayedAsset = currentResult
-    ? currentResult.status === 'ready' ? currentResult : undefined
-    : lastReadyAssets[graphicMenu]
+  const displayedAsset = currentResult?.status === 'ready'
+    ? currentResult
+    : currentResult?.status === 'missing'
+      ? undefined
+      : (lastReadyAssets[graphicMenu] ?? lastDisplayedAsset.current)
   const selectedSource = displayedAsset?.url
+  useEffect(() => {
+    if (currentResult?.status === 'ready') lastDisplayedAsset.current = currentResult
+  }, [currentResult])
   const showFallback = imageStatus === 'missing'
   const density = DENSITY_LAYOUTS[densityIndex]
   const copies = density.columns * density.rows
@@ -183,47 +269,72 @@ export default function App() {
 
   useEffect(() => {
     const url = frameAsset.url
-    // A previously loaded frame is ready immediately on returning to this menu.
-    const cached = assetResults[url]
-    if (cached) {
-      if (cached.status === 'ready') {
-        setLastReadyAssets((previous) => ({ ...previous, [graphicMenu]: cached }))
+    let active = true
+    // Subscription works whether preloading has already finished or not.
+    // The cache is shared by all five menus and all ten sequence frames.
+    void preloadGraphicAsset(url, 'high').then((result) => {
+      if (!active) return
+      setAssetResults((previous) => previous[url] === result ? previous : { ...previous, [url]: result })
+      if (result.status === 'ready') {
+        setLastReadyAssets((previous) => previous[graphicMenu] === result
+          ? previous : { ...previous, [graphicMenu]: result })
+        lastDisplayedAsset.current = result
       }
-      return
+    })
+    return () => { active = false }
+  }, [graphicMenu, frameAsset.url])
+
+  useEffect(() => {
+    let active = true
+    let backgroundTimer: ReturnType<typeof setTimeout> | undefined
+
+    // Small menu headings are warmed immediately so the title doesn't flash
+    // when the user clicks another study.
+    for (const study of navigationMenus) {
+      void preloadDecorativeImage(studyTitleAsset(study).src)
     }
 
-    let active = true
-    let settled = false
-    const image = new Image()
-    const store = (result: AssetResult) => {
-      if (!active || settled) return
-      settled = true
-      setAssetResults((previous) => ({ ...previous, [url]: result }))
-      if (result.status === 'ready') {
-        setLastReadyAssets((previous) => ({ ...previous, [graphicMenu]: result }))
-      }
-    }
-    const onLoaded = () => {
-      if (!image.naturalWidth || !image.naturalHeight) return
-      store({
-        status: 'ready',
-        url,
-        width: image.naturalWidth,
-        height: image.naturalHeight,
-        bounds: visibleImageBounds(image),
-      })
-    }
-    image.onload = onLoaded
-    image.onerror = () => store({ url, status: 'missing' })
-    image.src = url
-    // Also handle synchronously resolved browser-cache images.
-    if (image.complete && image.naturalWidth > 0) onLoaded()
+    // Fetch the initially selected frame in EVERY graphic section first. This
+    // makes first-time navigation responsive without waiting for a menu click.
+    const firstFrames = menus.map((menu) => getFrameAsset(menu, DEFAULTS.sequence).url)
+    void Promise.all(firstFrames.map((url) => preloadGraphicAsset(url))).then(() => {
+      if (!active) return
+      backgroundTimer = setTimeout(() => {
+        if (!active) return
+        // Limit concurrent background downloads and alpha-bound scans so the
+        // current stage and sliders remain responsive on slower devices.
+        const likelyNextFrames = menus.flatMap((menu) =>
+          [2, 3].map((frame) => getFrameAsset(menu, frame).url),
+        )
+        const remainingGraphics = menus.flatMap((menu) =>
+          Array.from({ length: 7 }, (_, index) => getFrameAsset(menu, index + 4).url),
+        )
+        const fontFolder = new URL('images/font/', document.baseURI).pathname
+        const fontPngs = Array.from({ length: 27 }, (_, index) =>
+          `${fontFolder}punch-font-${String(index + 2).padStart(2, '0')}.png`,
+        )
+        const queue: Array<() => Promise<unknown>> = [
+          ...likelyNextFrames.map((url) => () => preloadGraphicAsset(url)),
+          ...fontPngs.map((url) => () => preloadDecorativeImage(url)),
+          () => preloadDecorativeImage(`${INDEX_FOLDER}punch-index-36.png`),
+          ...remainingGraphics.map((url) => () => preloadGraphicAsset(url)),
+        ]
+        let next = 0
+        const worker = async () => {
+          while (active && next < queue.length) {
+            const item = queue[next++]
+            await item()
+          }
+        }
+        void Promise.all([worker(), worker(), worker()])
+      }, 250)
+    })
+
     return () => {
       active = false
-      image.onload = null
-      image.onerror = null
+      if (backgroundTimer !== undefined) clearTimeout(backgroundTimer)
     }
-  }, [graphicMenu, frameAsset.url])
+  }, [])
 
   useEffect(() => {
     const node = stageRef.current
@@ -427,6 +538,22 @@ export default function App() {
         </nav>
         <FontLab active={activeMenu === 'FONT'} printBackground={printBackground} onPrintBackgroundChange={setPrintBackground} />
         <section className="lab-layout" hidden={activeMenu === 'FONT'} aria-label={`${graphicMenu} composition`}>
+          {/* Mobile-only PRINT, anchored to the top-right of the whole gray studio,
+              above the IMAGE SEQUENCE wheel. Desktop PRINT stays untouched. */}
+          <div className="preview-actions mobile-preview-actions" aria-label="Print settings (mobile)">
+            <div className="print-dropdown">
+              <button className="print-export-button" type="button" aria-haspopup="true"
+                aria-label="PRINT: choose transparent or gray background" disabled={exporting}>
+                {exporting ? 'EXPORTING…' : 'PRINT'}
+              </button>
+              <div className="print-dropdown-menu" role="group" aria-label="Choose PNG export background">
+                <button className="print-format-button" type="button" aria-pressed={printBackground === 'transparent'} disabled={exporting}
+                  onClick={() => { setPrintBackground('transparent'); void exportPng('transparent') }}>TRANSPARENT</button>
+                <button className="print-format-button" type="button" aria-pressed={printBackground === 'background'} disabled={exporting}
+                  onClick={() => { setPrintBackground('background'); void exportPng('background') }}>BACKGROUND</button>
+              </div>
+            </div>
+          </div>
           <aside className="sequence-control" aria-label="Image sequence">
             <div className="study-inline-title">
               <strong className="study-inline-number tabular">{activeIndex}</strong>

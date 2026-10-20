@@ -696,3 +696,29 @@ h2 { font-size: clamp(37px, 4.15vw, 78px); line-height: .82; }
   }
   .graphic-actions { grid-column: 1 / -1; grid-row: 3; justify-self: end; gap: 30px; }
 }
+
+
+/* Mobile only: PIN PRINT to the gray studio's top-right corner, so it is
+   above the IMAGE SEQUENCE control instead of below the sequence wheel.
+   Keep the original preview PRINT unchanged on desktop. */
+.lab-layout > .mobile-preview-actions { display: none; }
+@media (max-width: 760px) {
+  .lab-layout { position: relative; }
+  .lab-layout > .mobile-preview-actions {
+    display: flex;
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    z-index: 40;
+  }
+  .lab-layout .preview-stage > .preview-actions,
+  .lab-layout .font-preview-stage > .preview-actions { display: none; }
+  /* Leave sufficient room beside the numbered study title for PRINT. */
+  .lab-layout .sequence-control > .study-inline-title,
+  .lab-layout .font-axis-panel > .study-inline-title {
+    max-width: calc(100% - 112px);
+  }
+  .lab-layout .study-inline-title .study-name-image {
+    max-width: min(100%, calc(100vw - 190px));
+  }
+}

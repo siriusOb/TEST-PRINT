@@ -322,6 +322,11 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
       })
     }
     const onKeyboardDown = (event: KeyboardEvent) => {
+      // On iPhone-sized screens, let the real focused textarea handle native
+      // software keyboard input. Preventing keydown here may dismiss the iOS
+      // keyboard or make it fail to type into the textarea.
+      if (document.activeElement === inputRef.current &&
+          window.matchMedia('(max-width: 760px) and (pointer: coarse)').matches) return
       if (event.isComposing) return
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
         // Sliders and buttons keep their shortcuts; everywhere else in FONT,
@@ -409,6 +414,10 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
     return best
   }
   const beginTextSelection = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // A real full-size transparent textarea receives native taps on phones.
+    // Do not preventDefault() or capture its pointer: iOS Safari needs the
+    // untouched tap event to bring up and keep the software keyboard.
+    if (event.target === inputRef.current) return
     if ((event.target as HTMLElement).closest('.preview-actions')) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
     event.preventDefault()
@@ -508,6 +517,25 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
 
   return (
     <section className="lab-layout font-layout" hidden={!active} aria-label="FONT text composition">
+      {/* Mobile PRINT is anchored to the top-right of the gray lab, rather
+          than following the preview below the header. Desktop remains as-is. */}
+      <div className="preview-actions mobile-preview-actions" aria-label="Print settings (mobile)">
+        <div className="print-dropdown">
+          <button className="print-export-button" type="button" aria-haspopup="true"
+            aria-label="PRINT: choose transparent or gray background"
+            disabled={exporting || layout.glyphs.length === 0}>
+            {exporting ? 'EXPORTING…' : 'PRINT'}
+          </button>
+          <div className="print-dropdown-menu" role="group" aria-label="Choose PNG export background">
+            <button className="print-format-button" type="button" aria-pressed={printBackground === 'transparent'}
+              disabled={exporting || layout.glyphs.length === 0}
+              onClick={() => { onPrintBackgroundChange('transparent'); void print('transparent') }}>TRANSPARENT</button>
+            <button className="print-format-button" type="button" aria-pressed={printBackground === 'background'}
+              disabled={exporting || layout.glyphs.length === 0}
+              onClick={() => { onPrintBackgroundChange('background'); void print('background') }}>BACKGROUND</button>
+          </div>
+        </div>
+      </div>
       <aside className="font-axis-panel" aria-label="Vertical and horizontal letter proportion">
         <div className="study-inline-title font-study-inline-title">
           <strong className="study-inline-number tabular">00</strong>
@@ -584,6 +612,22 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
       {/* Full-width second grid row: controls are no longer positioned over the
           left axis panel. This keeps ALIGN buttons fully clickable. */}
       <section className="font-control-rail" aria-label="Font adjustment controls">
+          {/* On phones the FONT axis scale belongs below the composition and
+              above ALIGN. Desktop still uses its original vertical slider. */}
+          <label className="rail-control font-mobile-axis-control">
+            <span>VERTICAL — HORIZONTAL</span>
+            <strong className="tabular">{axis === 0 ? '0%' : axis > 0 ? `V +${axis}%` : `H +${-axis}%`}</strong>
+            <input type="range" aria-label="Vertical to horizontal font scale (mobile)"
+              min="-260" max="260" step="5" value={-axis}
+              style={{
+                '--fill-start': axis > 0 ? `${50 - axis / 5.2}%` : '50%',
+                '--fill-end': axis < 0 ? `${50 - axis / 5.2}%` : '50%',
+              } as CSSProperties}
+              onPointerDown={beginSliderDrag} onPointerUp={endSliderDrag}
+              onPointerCancel={endSliderDrag} onBlur={endSliderDrag}
+              onChange={(event) => setAxis(-snapToDefault(Number(event.target.value), -FONT_DEFAULTS.axis, 15))} />
+            <small>VERTICAL ← 0 → HORIZONTAL</small>
+          </label>
           <fieldset className="font-align-control">
             <legend>ALIGN</legend>
             <div className="font-align-options">
