@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import GraphicAsset from './components/GraphicAsset'
 import FontLab from './FontLab'
+import IosPrintSave, { canvasToPngBlob, isIosPrintDevice, type IosPrintImage } from './IosPrintSave'
 import { getFrameAsset, menus, type MenuName } from './lib/assetManifest'
 import './index.css'
 
@@ -213,6 +214,9 @@ export default function App() {
   const [axisScale, setAxisScale] = useState(DEFAULTS.axisScale)
   const [densityIndex, setDensityIndex] = useState(DEFAULTS.densityIndex)
   const [exporting, setExporting] = useState(false)
+  const [iosPrintImage, setIosPrintImage] = useState<IosPrintImage | null>(null)
+  // Release previous PNG URLs when the user closes or replaces the iPhone preview.
+  useEffect(() => () => { if (iosPrintImage) URL.revokeObjectURL(iosPrintImage.url) }, [iosPrintImage])
   // Shared across all six studies; default retains the original gray print.
   const [printBackground, setPrintBackground] = useState<PrintBackground>('background')
   const activeSlider = useRef<'form' | 'axis' | 'density' | null>(null)
@@ -500,10 +504,21 @@ export default function App() {
           context.restore()
         }
       }
-      const link = document.createElement('a')
-      link.download = `${activeMenu.toLowerCase()}-frame-${String(sequence).padStart(2, '0')}-${backgroundMode}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
+      const filename = `${activeMenu.toLowerCase()}-frame-${String(sequence).padStart(2, '0')}-${backgroundMode}.png`
+      if (isIosPrintDevice()) {
+        // A programmatic a[download].click() is unreliable for PNG exports in
+        // iOS Safari. Prepare a real File, then allow a fresh user tap to open
+        // the native Share Sheet (required by Safari's user activation rules).
+        const blob = await canvasToPngBlob(canvas)
+        const file = new File([blob], filename, { type: 'image/png' })
+        setIosPrintImage({ file, url: URL.createObjectURL(file) })
+      } else {
+        // Desktop PRINT path intentionally stays exactly as before.
+        const link = document.createElement('a')
+        link.download = filename
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+      }
     } catch (error) {
       console.error('PNG export failed:', error)
       window.alert('PNG 내보내기에 실패했습니다. 콘솔을 확인해 주세요.')
@@ -612,6 +627,7 @@ export default function App() {
           </div>
         </section>
       </main>
+      <IosPrintSave image={iosPrintImage} onClose={() => setIosPrintImage(null)} />
     </div>
   )
 }

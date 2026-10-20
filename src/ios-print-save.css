@@ -1,0 +1,56 @@
+/* iPhone/iPad print only. This sheet does not change any existing desktop
+   preview, controls, dropdowns, or graphics. The UI mounts into body only
+   when an iOS PRINT PNG is ready. */
+   .ios-print-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;
+    background: rgba(0, 0, 0, .66);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+  .ios-print-dialog {
+    box-sizing: border-box;
+    width: min(100%, 480px);
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    background: #b4bdcc;
+    color: #001ef7;
+    padding: 18px;
+    border: 1px solid #001ef7;
+    font-family: inherit;
+  }
+  .ios-print-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+  .ios-print-heading strong { font-size: 15px; font-weight: 850; letter-spacing: .06em; }
+  .ios-print-dialog .ios-print-close {
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid #001ef7; background: transparent; color: #001ef7;
+    min-width: 38px; min-height: 38px; font-size: 18px; cursor: pointer;
+  }
+  .ios-print-instructions { margin: 12px 0; font-size: 12px; line-height: 1.55; }
+  .ios-print-image-wrap {
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.32);
+    overflow: hidden; min-height: 120px; max-height: 40vh;
+    border: 1px solid rgba(0, 30, 247, .35);
+  }
+  .ios-print-image-wrap img { display: block; width: auto; height: auto; max-width: 100%; max-height: 40vh; object-fit: contain; }
+  .ios-print-dialog .ios-print-share {
+    display: block; width: 100%; min-height: 48px;
+    margin-top: 14px; padding: 10px 12px; border: 1px solid #001ef7;
+    background: #001ef7; color: white; font: inherit; font-size: 12px; font-weight: 800;
+    text-align: center; cursor: pointer;
+  }
+  .ios-print-open {
+    display: block; margin-top: 9px; padding: 11px 12px;
+    font-size: 11px; font-weight: 750; color: #001ef7;
+    border: 1px solid #001ef7; background: transparent; text-decoration: none; text-align: center;
+  }
+  .ios-print-help { margin: 12px 0 0; line-height: 1.5; font-size: 10px; }
+  .ios-print-error { margin: 12px 0 0; line-height: 1.45; color: #8f1739; font-size: 11px; }
+  

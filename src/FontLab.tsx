@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import './font-lab.css'
+import IosPrintSave, { canvasToPngBlob, isIosPrintDevice, type IosPrintImage } from './IosPrintSave'
 
 type Alignment = 'LEFT' | 'CENTER' | 'RIGHT'
 type PrintBackground = 'background' | 'transparent'
@@ -226,6 +227,8 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
   const [alignment, setAlignment] = useState<Alignment>(FONT_DEFAULTS.alignment)
   const [referenceRatio, setReferenceRatio] = useState(0.76)
   const [exporting, setExporting] = useState(false)
+  const [iosPrintImage, setIosPrintImage] = useState<IosPrintImage | null>(null)
+  useEffect(() => () => { if (iosPrintImage) URL.revokeObjectURL(iosPrintImage.url) }, [iosPrintImage])
   const [stageSize, setStageSize] = useState({ width: 900, height: 480 })
   const stageRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -503,10 +506,18 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
         const image = images.get(glyph.char)
         if (image) context.drawImage(image, glyph.x, glyph.y, glyph.width, glyph.height)
       }
-      const link = document.createElement('a')
-      link.href = canvas.toDataURL('image/png')
-      link.download = `font-test-print-${backgroundMode}.png`
-      link.click()
+      const filename = `font-test-print-${backgroundMode}.png`
+      if (isIosPrintDevice()) {
+        const blob = await canvasToPngBlob(canvas)
+        const file = new File([blob], filename, { type: 'image/png' })
+        setIosPrintImage({ file, url: URL.createObjectURL(file) })
+      } else {
+        // Keep the original desktop PNG download method unchanged.
+        const link = document.createElement('a')
+        link.href = canvas.toDataURL('image/png')
+        link.download = filename
+        link.click()
+      }
     } catch (error) {
       console.error('FONT PRINT failed:', error)
       window.alert('FONT PNG 내보내기에 실패했습니다.')
@@ -667,6 +678,7 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
             <button className="random-trigger" type="button" onClick={randomize}>RANDOM</button>
           </div>
       </section>
+      <IosPrintSave image={iosPrintImage} onClose={() => setIosPrintImage(null)} />
     </section>
   )
 }
