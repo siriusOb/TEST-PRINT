@@ -580,7 +580,10 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
             )}
           </div>
         </div>
-        <section className="font-control-rail" aria-label="Font adjustment controls">
+      </div>
+      {/* Full-width second grid row: controls are no longer positioned over the
+          left axis panel. This keeps ALIGN buttons fully clickable. */}
+      <section className="font-control-rail" aria-label="Font adjustment controls">
           <fieldset className="font-align-control">
             <legend>ALIGN</legend>
             <div className="font-align-options">
@@ -619,8 +622,7 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
             <button className="reset-trigger" type="button" onClick={reset}>RESET</button>
             <button className="random-trigger" type="button" onClick={randomize}>RANDOM</button>
           </div>
-        </section>
-      </div>
+      </section>
     </section>
   )
 }

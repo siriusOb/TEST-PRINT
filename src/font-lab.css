@@ -418,3 +418,41 @@
   }
   .font-actions { grid-column: 1 / -1; grid-row: 3; gap: 30px; }
 }
+
+
+/* ALIGN click fix — use a real, full-width grid row rather than a negatively
+   offset child of the preview. The sidebar no longer covers any buttons. */
+.font-layout .font-preview-column {
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-rows: minmax(0, auto);
+  min-width: 0;
+}
+.font-layout .font-control-rail {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  margin-left: 0;
+  position: relative;
+  z-index: 2;
+}
+.font-layout .font-align-control,
+.font-layout .font-align-options,
+.font-layout .font-align-options button {
+  position: relative;
+  pointer-events: auto;
+}
+.font-layout .font-align-options button {
+  touch-action: manipulation;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .font-layout .font-preview-column {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .font-layout .font-control-rail {
+    grid-column: 1;
+    grid-row: 3;
+  }
+}
