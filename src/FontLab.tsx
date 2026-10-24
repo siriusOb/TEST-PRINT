@@ -57,7 +57,6 @@ const FONT_DEFAULTS = {
   leading: 0,
   alignment: 'LEFT' as Alignment,
 }
-const MAX_ALPHABETS_PER_LINE = 15
 const TRACKING_RATIO = 0.13
 const SPACE_RATIO = 0.5
 const LEADING_RATIO = 0.5
@@ -71,25 +70,24 @@ function sanitizeText(raw: string): string {
   return raw.toUpperCase().replace(/\r\n?/g, '\n').replace(/[^A-Z. \n]/g, '').slice(0, 6000)
 }
 
-// Word-aware soft wrap. Keep the original text and character offsets intact:
-// soft wraps are visual only, while a user-entered Enter remains a hard break.
-// The 15-character limit counts visible glyphs (including periods); a single
-// unbroken word over 15 glyphs is kept whole rather than splitting a word.
-type IndexedChar = { char: string; index: number }
+// Word-aware visual line breaks: measure the actual available stage width,
+// not a character limit or an estimated rectangular composition width.
+// Source offsets remain unchanged for selection, caret and native textarea.
+type IndexedChar = { char: string; index: number; scale?: number }
 type FontLine = { chars: IndexedChar[]; newlineIndex?: number }
 
 function measuredLineWidth(chars: IndexedChar[], glyphWidth: number, glyphGap: number, spaceAdvance: number): number {
   let cursor = 0
   let minX = 0
   let maxX = 0
-  let previousWasGlyph = false
-  for (const { char } of chars) {
-    if (char !== ' ' && previousWasGlyph) cursor += glyphGap
+  let previousGlyphScale: number | null = null
+  for (const { char, scale = 1 } of chars) {
+    if (char !== ' ' && previousGlyphScale !== null) cursor += glyphGap * Math.min(previousGlyphScale, scale)
     const before = cursor
-    cursor += char === ' ' ? spaceAdvance : glyphWidth
+    cursor += (char === ' ' ? spaceAdvance : glyphWidth) * scale
     minX = Math.min(minX, before)
     maxX = Math.max(maxX, cursor)
-    previousWasGlyph = char !== ' '
+    previousGlyphScale = char === ' ' ? null : scale
   }
   return maxX - minX
 }
@@ -99,41 +97,54 @@ function splitIntoLines(
   glyphWidth: number, glyphGap: number, spaceAdvance: number,
 ): FontLine[] {
   const lines: FontLine[] = [{ chars: [] }]
-  let lineGlyphCount = 0
   let pendingSpaces: IndexedChar[] = []
   const tokens = /[A-Z.]+| +|\n/g
   for (const match of text.matchAll(tokens)) {
     const token = match[0]
     const index = match.index ?? 0
     if (token === '\n') {
-      lines[lines.length - 1].chars.push(...pendingSpaces)
+      // Spaces before an explicit newline have no visual width at line end.
+      lines[lines.length - 1].chars.push(...pendingSpaces.map(c => ({ ...c, scale: 0 })))
       pendingSpaces = []
       lines[lines.length - 1].newlineIndex = index
       lines.push({ chars: [] })
-      lineGlyphCount = 0
     } else if (token[0] === ' ') {
       pendingSpaces.push(...Array.from(token, (char, i) => ({ char, index: index + i })))
     } else {
-      const word = Array.from(token, (char, i) => ({ char, index: index + i }))
+      const rawWord = Array.from(token, (char, i) => ({ char, index: index + i }))
+      const rawWordWidth = measuredLineWidth(rawWord, glyphWidth, glyphGap, spaceAdvance)
+      // A single indivisible word can be wider than the stage at large FONT SIZE.
+      // Fit *only that word* rather than shrinking the entire composition or
+      // clipping the right edge. Normal words keep the exact selected FONT SIZE.
+      const wordScale = Math.min(1, maxLineWidth / Math.max(1, rawWordWidth))
+      const word = rawWord.map(c => ({ ...c, scale: wordScale }))
       const currentLine = lines[lines.length - 1]
-      const nextWidth = measuredLineWidth(
-        [...currentLine.chars, ...pendingSpaces, ...word], glyphWidth, glyphGap, spaceAdvance,
-      )
-      if (lineGlyphCount > 0 &&
-          (lineGlyphCount + word.length > MAX_ALPHABETS_PER_LINE || nextWidth > maxLineWidth)) {
-        // Spaces stay on the previous visual line, never indent the next word.
-        // Their source indexes remain available for caret/selection handling.
-        currentLine.chars.push(...pendingSpaces)
-        lines.push({ chars: [...word] })
-        lineGlyphCount = word.length
+      const hasWordOnLine = currentLine.chars.some(c => c.char !== ' ')
+      const candidate = [...currentLine.chars, ...pendingSpaces, ...word]
+      const nextWidth = measuredLineWidth(candidate, glyphWidth, glyphGap, spaceAdvance)
+      if (hasWordOnLine && nextWidth > maxLineWidth + 0.001) {
+        // Keep the original space offsets but don't render indentation at the
+        // new visual line or let trailing whitespace push the stage outside.
+        currentLine.chars.push(...pendingSpaces.map(c => ({ ...c, scale: 0 })))
+        lines.push({ chars: word })
+      } else if (nextWidth > maxLineWidth + 0.001) {
+        // Leading spaces should not force an otherwise fitting word to clip.
+        currentLine.chars.push(...pendingSpaces.map(c => ({ ...c, scale: 0 })), ...word)
       } else {
         currentLine.chars.push(...pendingSpaces, ...word)
-        lineGlyphCount += word.length
       }
       pendingSpaces = []
     }
   }
-  lines[lines.length - 1].chars.push(...pendingSpaces)
+  // Keep final spaces in the editable value; show as many as can fit visually.
+  for (const space of pendingSpaces) {
+    const currentLine = lines[lines.length - 1]
+    if (measuredLineWidth([...currentLine.chars, space], glyphWidth, glyphGap, spaceAdvance) <= maxLineWidth) {
+      currentLine.chars.push(space)
+    } else {
+      currentLine.chars.push({ ...space, scale: 0 })
+    }
+  }
   return lines
 }
 
@@ -148,39 +159,29 @@ function makeFontLayout(
   const spaceAdvance = glyphWidth * Math.max(0.02, SPACE_RATIO + TRACKING_RATIO * tracking)
   const lineGap = glyphHeight * LEADING_RATIO * (1 + leading)
 
-  // Keep fontSize as the actual PNG drawing size. Previously, the full width
-  // of a long line was scaled down to fit the preview, making the FONT SIZE
-  // slider look ineffective for long text. Wrap between words first instead.
-  const availableWidth = Math.max(1, stageWidth - 64)
-  const glyphCount = (text.match(/[A-Z.]/g) ?? []).length
-  const spaceCount = (text.match(/ /g) ?? []).length
-  const estimatedAdvance = glyphCount * (glyphWidth + Math.max(0, glyphGap)) + spaceCount * spaceAdvance
-  // A compact, roughly landscape-rectangular text block is more readable than
-  // either one very long line or a tall single-word column. The optimal target
-  // adapts continuously to letter size, leading, and viewport width.
-  const idealBlockWidth = Math.sqrt(Math.max(1, estimatedAdvance) *
-    Math.max(glyphHeight, glyphHeight + lineGap) * 1.6)
-  const targetWidth = Math.min(availableWidth, Math.max(glyphWidth * 3, idealBlockWidth))
-  const lines = splitIntoLines(text, targetWidth, glyphWidth, glyphGap, spaceAdvance)
+  // stageWidth is the measured content-box width (minus a small safety inset).
+  // Recalculate every time FONT SIZE, axis, tracking or viewport width changes.
+  const availableWidth = Math.max(1, stageWidth)
+  const lines = splitIntoLines(text, availableWidth, glyphWidth, glyphGap, spaceAdvance)
   const prepared = lines.map((line) => {
     let cursor = 0
-    let previousWasGlyph = false
+    let previousGlyphScale: number | null = null
     let minX = 0
     let maxX = 0
-    const items: { char: string; x: number; width: number; index: number; before: number; after: number }[] = []
-    for (const { char, index } of line.chars) {
-      if (char !== ' ' && previousWasGlyph) cursor += glyphGap
+    const items: { char: string; x: number; width: number; height: number; index: number; scale: number }[] = []
+    for (const { char, index, scale = 1 } of line.chars) {
+      if (char !== ' ' && previousGlyphScale !== null) cursor += glyphGap * Math.min(previousGlyphScale, scale)
       const before = cursor
-      const width = char === ' ' ? spaceAdvance : glyphWidth
+      const width = (char === ' ' ? spaceAdvance : glyphWidth) * scale
       cursor += width
-      items.push({ char, x: before, width, index, before, after: cursor })
+      items.push({ char, x: before, width, height: glyphHeight * scale, index, scale })
       minX = Math.min(minX, before)
       maxX = Math.max(maxX, cursor)
-      previousWasGlyph = char !== ' '
+      previousGlyphScale = char === ' ' ? null : scale
     }
     return { items, minX, width: Math.max(0, maxX - minX), cursor, newlineIndex: line.newlineIndex }
   })
-  const maximumLineWidth = Math.max(glyphWidth, ...prepared.map((line) => line.width))
+  const maximumLineWidth = Math.max(1, ...prepared.map(line => line.width))
   const glyphs: FontGlyph[] = []
   const characterBoxes: CharacterBox[] = []
   const carets: CaretPosition[] = Array.from({ length: text.length + 1 }, () => ({ x: 0, y: 0 }))
@@ -194,10 +195,11 @@ function makeFontLayout(
     for (const item of line.items) {
       const x = item.x + xOffset
       carets[item.index] = { x, y }
-      carets[item.index + 1] = { x: x + item.width + (item.char !== ' ' ? glyphGap : 0), y }
+      carets[item.index + 1] = { x: x + item.width, y }
       characterBoxes.push({ index: item.index, x, y, width: Math.max(2, item.width), height: glyphHeight })
       if (item.char !== ' ') {
-        glyphs.push({ char: item.char, x, y, width: glyphWidth, height: glyphHeight, url: fontUrl(item.char), id: item.index })
+        glyphs.push({ char: item.char, x, y: y + glyphHeight - item.height,
+          width: item.width, height: item.height, url: fontUrl(item.char), id: item.index })
       }
     }
     if (line.newlineIndex !== undefined) {
@@ -207,12 +209,12 @@ function makeFontLayout(
       characterBoxes.push({ index, x, y, width: Math.max(4, glyphWidth * .15), height: glyphHeight })
       carets[index + 1] = { x: lineOffsets[lineIndex + 1] ?? 0, y: (lineIndex + 1) * lineStep }
     }
-    // At a soft wrap, the next character has the same logical index as this
-    // line's trailing caret. Its position is supplied by the next line.
   })
   const endLine = prepared[prepared.length - 1]
+  const finalCharIsGlyph = /[A-Z.]$/.test(text)
+  const extraGap = finalCharIsGlyph ? Math.max(0, glyphGap) : 0
   const lastPosition = {
-    x: lineOffsets[prepared.length - 1] + endLine.cursor + (/[A-Z.]$/.test(text) ? glyphGap : 0),
+    x: Math.min(availableWidth, lineOffsets[prepared.length - 1] + endLine.cursor + extraGap),
     y: (prepared.length - 1) * lineStep,
   }
   if (text.length === 0) lastPosition.x = maximumLineWidth / 2
@@ -306,8 +308,13 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
     const measure = () => {
       const rect = node.getBoundingClientRect()
       if (rect.width > 0 && rect.height > 0) {
-        setStageSize((prior) => prior.width === rect.width && prior.height === rect.height
-          ? prior : { width: rect.width, height: rect.height })
+        const style = getComputedStyle(node)
+        const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+        // Measure the real drawing space, not the outer preview element.
+        // 12px of safety inset prevents a glyph touching the clipped edge.
+        const width = Math.max(1, node.clientWidth - paddingX - 12)
+        setStageSize((prior) => prior.width === width && prior.height === rect.height
+          ? prior : { width, height: rect.height })
       }
     }
     measure()
@@ -441,12 +448,9 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
     [layout, selection.start, selection.end],
   )
 
-  // Never reduce the user's chosen FONT SIZE to fit the *whole* text. If an
-  // indivisible word is wider than the stage, allow horizontal scrolling for
-  // that exceptional line; otherwise word wrapping keeps everything in view.
-  // This also preserves the exact text size in PRINT output and on screen.
+  // Normal words retain FONT SIZE; only an individual word wider than the
+  // viewport gets a local fit adjustment. The whole composition never shrinks.
   const factor = 1
-  const hasUnbreakableOverflow = Math.max(layout.width, layout.caretX + 4) > stageSize.width - 64
   const contentMinHeight = Math.ceil(layout.height + 110)
 
   // The visible PNG composition and the hidden native textarea share the same
@@ -617,12 +621,7 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
       </aside>
       <div className="font-preview-column">
         <div ref={stageRef} className="font-preview-stage"
-          style={{
-            '--font-content-min-height': `${contentMinHeight}px`,
-            // Very long single words cannot soft-wrap without splitting them.
-            // Scroll just that oversized composition instead of shrinking PNGs.
-            ...(hasUnbreakableOverflow ? { overflowX: 'auto', justifyContent: 'flex-start' } : {}),
-          } as CSSProperties}
+          style={{ '--font-content-min-height': `${contentMinHeight}px` } as CSSProperties}
           onPointerDown={beginTextSelection}
           onPointerMove={moveTextSelection}
           onPointerUp={finishTextSelection}
