@@ -60,6 +60,9 @@ const FONT_DEFAULTS = {
 const TRACKING_RATIO = 0.13
 const SPACE_RATIO = 0.5
 const LEADING_RATIO = 0.5
+const MAX_CHARS_PER_LINE = 30
+const MIN_FONT_SIZE = 24
+const MAX_FONT_SIZE = 220
 
 function fontUrl(char: string) {
   const index = char === '.' ? 28 : char.charCodeAt(0) - 65 + 2
@@ -70,9 +73,11 @@ function sanitizeText(raw: string): string {
   return raw.toUpperCase().replace(/\r\n?/g, '\n').replace(/[^A-Z. \n]/g, '').slice(0, 6000)
 }
 
-// Word-aware visual line breaks: measure the actual available stage width,
-// not a character limit or an estimated rectangular composition width.
-// Source offsets remain unchanged for selection, caret and native textarea.
+// Soft-wrap the original text (never insert actual Enter characters). Both the
+// visible PNGs and exported canvas consume the same source-indexed layout.
+// Words stay intact whenever they fit. A word longer than 30 characters -- or
+// wider than the entire stage at the manually selected size -- is an unavoidable
+// exception: break it into glyph-safe fragments rather than clip the artwork.
 type IndexedChar = { char: string; index: number; scale?: number }
 type FontLine = { chars: IndexedChar[]; newlineIndex?: number }
 
@@ -98,54 +103,88 @@ function splitIntoLines(
 ): FontLine[] {
   const lines: FontLine[] = [{ chars: [] }]
   let pendingSpaces: IndexedChar[] = []
+  const visibleCount = (chars: IndexedChar[]) => chars.reduce((n, c) => n + (c.scale === 0 ? 0 : 1), 0)
+  const fits = (chars: IndexedChar[]) => visibleCount(chars) <= MAX_CHARS_PER_LINE &&
+    measuredLineWidth(chars, glyphWidth, glyphGap, spaceAdvance) <= maxLineWidth + 0.001
+
   const tokens = /[A-Z.]+| +|\n/g
   for (const match of text.matchAll(tokens)) {
     const token = match[0]
     const index = match.index ?? 0
     if (token === '\n') {
-      // Spaces before an explicit newline have no visual width at line end.
       lines[lines.length - 1].chars.push(...pendingSpaces.map(c => ({ ...c, scale: 0 })))
       pendingSpaces = []
       lines[lines.length - 1].newlineIndex = index
       lines.push({ chars: [] })
-    } else if (token[0] === ' ') {
+      continue
+    }
+    if (token[0] === ' ') {
       pendingSpaces.push(...Array.from(token, (char, i) => ({ char, index: index + i })))
-    } else {
-      const rawWord = Array.from(token, (char, i) => ({ char, index: index + i }))
-      const rawWordWidth = measuredLineWidth(rawWord, glyphWidth, glyphGap, spaceAdvance)
-      // A single indivisible word can be wider than the stage at large FONT SIZE.
-      // Fit *only that word* rather than shrinking the entire composition or
-      // clipping the right edge. Normal words keep the exact selected FONT SIZE.
-      const wordScale = Math.min(1, maxLineWidth / Math.max(1, rawWordWidth))
-      const word = rawWord.map(c => ({ ...c, scale: wordScale }))
-      const currentLine = lines[lines.length - 1]
-      const hasWordOnLine = currentLine.chars.some(c => c.char !== ' ')
-      const candidate = [...currentLine.chars, ...pendingSpaces, ...word]
-      const nextWidth = measuredLineWidth(candidate, glyphWidth, glyphGap, spaceAdvance)
-      if (hasWordOnLine && nextWidth > maxLineWidth + 0.001) {
-        // Keep the original space offsets but don't render indentation at the
-        // new visual line or let trailing whitespace push the stage outside.
-        currentLine.chars.push(...pendingSpaces.map(c => ({ ...c, scale: 0 })))
-        lines.push({ chars: word })
-      } else if (nextWidth > maxLineWidth + 0.001) {
-        // Leading spaces should not force an otherwise fitting word to clip.
-        currentLine.chars.push(...pendingSpaces.map(c => ({ ...c, scale: 0 })), ...word)
-      } else {
-        currentLine.chars.push(...pendingSpaces, ...word)
+      continue
+    }
+
+    const word = Array.from(token, (char, i) => ({ char, index: index + i }))
+    // Usually one whole word. Only fragment it when even an empty line
+    // couldn't fit this single token, or it exceeds the absolute 30-character cap.
+    const fragments: IndexedChar[][] = []
+    let fragment: IndexedChar[] = []
+    for (const character of word) {
+      if (fragment.length && !fits([...fragment, character])) {
+        fragments.push(fragment)
+        fragment = []
       }
-      pendingSpaces = []
+      if (!fits([character])) {
+        // Exception for a *single* glyph wider than the entire stage.
+        fragment.push({ ...character, scale: Math.max(0.01, maxLineWidth / Math.max(1, glyphWidth)) })
+      } else {
+        fragment.push(character)
+      }
     }
+    if (fragment.length) fragments.push(fragment)
+
+    fragments.forEach((chunk, chunkIndex) => {
+      const current = lines[lines.length - 1]
+      const prefix = chunkIndex === 0 ? pendingSpaces : []
+      const candidate = [...current.chars, ...prefix, ...chunk]
+      if (current.chars.some(c => c.char !== ' ') && !fits(candidate)) {
+        // Move the whole word to the next line when possible, keeping all
+        // whitespace indices for the caret and selection logic.
+        current.chars.push(...prefix.map(c => ({ ...c, scale: 0 })))
+        lines.push({ chars: chunk })
+      } else if (!fits(candidate)) {
+        // Leading spaces shouldn't push the first word past the stage edge.
+        current.chars.push(...prefix.map(c => ({ ...c, scale: 0 })), ...chunk)
+      } else {
+        current.chars.push(...prefix, ...chunk)
+      }
+      // Subsequent fragments of a too-long, unspaced word must begin a new
+      // line if the current line is full; this cannot alter the source text.
+    })
+    pendingSpaces = []
   }
-  // Keep final spaces in the editable value; show as many as can fit visually.
   for (const space of pendingSpaces) {
-    const currentLine = lines[lines.length - 1]
-    if (measuredLineWidth([...currentLine.chars, space], glyphWidth, glyphGap, spaceAdvance) <= maxLineWidth) {
-      currentLine.chars.push(space)
-    } else {
-      currentLine.chars.push({ ...space, scale: 0 })
-    }
+    const line = lines[lines.length - 1]
+    line.chars.push(fits([...line.chars, space]) ? space : { ...space, scale: 0 })
   }
   return lines
+}
+
+// When text is edited, estimate the font size that would fit the longest
+// 30-character, whole-word visual line. This is a *real* change to fontSize,
+// reflected immediately in the native slider instead of a hidden CSS scale.
+// Direct slider moves bypass this fitting and reflow at the exact chosen size.
+function autoFittedSize(
+  text: string, preferred: number, axis: number, tracking: number,
+  baseRatio: number, stageWidth: number,
+): number {
+  if (!text) return preferred
+  const unitGlyphWidth = baseRatio * (axis < 0 ? 1 + Math.abs(axis) / 100 : 1)
+  const unitGlyphGap = unitGlyphWidth * TRACKING_RATIO * (1 + tracking)
+  const unitSpace = unitGlyphWidth * Math.max(0.02, SPACE_RATIO + TRACKING_RATIO * tracking)
+  const lines = splitIntoLines(text, Number.POSITIVE_INFINITY, unitGlyphWidth, unitGlyphGap, unitSpace)
+  const widest = Math.max(1e-6, ...lines.map(line => measuredLineWidth(line.chars, unitGlyphWidth, unitGlyphGap, unitSpace)))
+  const ceiling = Math.floor(Math.max(1, stageWidth) / widest)
+  return Math.max(MIN_FONT_SIZE, Math.min(preferred, MAX_FONT_SIZE, ceiling))
 }
 
 function makeFontLayout(
@@ -266,6 +305,10 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
   const [inputFocused, setInputFocused] = useState(false)
   const [selection, setSelection] = useState({ start: 0, end: 0 })
   const [fontSize, setFontSize] = useState(FONT_DEFAULTS.size)
+  // What the person most recently selected using FONT SIZE, RESET or RANDOM.
+  // Input may temporarily fit smaller; removing text can restore this target.
+  const preferredFontSize = useRef(FONT_DEFAULTS.size)
+  const currentText = useRef('')
   const [axis, setAxis] = useState(FONT_DEFAULTS.axis)
   const [tracking, setTracking] = useState(FONT_DEFAULTS.tracking)
   const [leading, setLeading] = useState(FONT_DEFAULTS.leading)
@@ -280,6 +323,16 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
   const compositionRef = useRef<HTMLDivElement>(null)
   const dragAnchor = useRef<number | null>(null)
   const draggingSlider = useRef(false)
+  // Keyboard repeat uses a long-lived event listener: these refs keep its
+  // measurements current without repeatedly detaching the keyboard handler.
+  const axisRef = useRef(axis)
+  const trackingRef = useRef(tracking)
+  const referenceRatioRef = useRef(referenceRatio)
+  const stageWidthRef = useRef(stageSize.width)
+  axisRef.current = axis
+  trackingRef.current = tracking
+  referenceRatioRef.current = referenceRatio
+  stageWidthRef.current = stageSize.width
   // Keyboard repeat is controlled here rather than relying on native macOS
   // press-and-hold character behavior, which may show an accent menu instead.
   const beginSliderDrag = () => { draggingSlider.current = true }
@@ -323,6 +376,15 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
     return () => resize.disconnect()
   }, [])
 
+  // Only a genuine content-width change should recompute automatic fit.
+  // Direct slider moves remain exact until text or viewport width changes.
+  useEffect(() => {
+    if (currentText.current) {
+      setFontSize(autoFittedSize(currentText.current, preferredFontSize.current,
+        axisRef.current, trackingRef.current, referenceRatioRef.current, stageWidthRef.current))
+    }
+  }, [stageSize.width, referenceRatio])
+
   // Handle physical keyboard repeats in one place. Ctrl/Cmd+A selects the
   // underlying text (PNG glyphs are only the visual representation). Typing or
   // Backspace replaces the selection, as in a normal text editor.
@@ -350,32 +412,33 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
       const editing = input !== null && document.activeElement === input
       const capturedStart = editing ? input.selectionStart : null
       const capturedEnd = editing ? input.selectionEnd : null
-      setText((previous) => {
-        const start = capturedStart === null ? previous.length : Math.min(capturedStart, previous.length)
-        const end = capturedEnd === null ? previous.length : Math.min(capturedEnd, previous.length)
-        let next: string
-        let caret: number
-        if (key === 'Backspace') {
-          const from = start === end ? Math.max(0, start - 1) : start
-          next = previous.slice(0, from) + previous.slice(end)
-          caret = from
-        } else {
-          const inserted = key === 'Enter' ? '\n' : key
-          next = previous.slice(0, start) + inserted + previous.slice(end)
-          caret = start + inserted.length
-        }
-        next = sanitizeText(next)
-        if (editing) {
-          // Position the caret after React commits the new controlled value.
-          requestAnimationFrame(() => {
-            if (input && document.activeElement === input) {
-              input.setSelectionRange(caret, caret)
-              setSelection({ start: caret, end: caret })
-            }
-          })
-        }
-        return next
-      })
+      const previous = currentText.current
+      const start = capturedStart === null ? previous.length : Math.min(capturedStart, previous.length)
+      const end = capturedEnd === null ? previous.length : Math.min(capturedEnd, previous.length)
+      let next: string
+      let caret: number
+      if (key === 'Backspace') {
+        const from = start === end ? Math.max(0, start - 1) : start
+        next = previous.slice(0, from) + previous.slice(end)
+        caret = from
+      } else {
+        const inserted = key === 'Enter' ? '\n' : key
+        next = previous.slice(0, start) + inserted + previous.slice(end)
+        caret = start + inserted.length
+      }
+      next = sanitizeText(next)
+      currentText.current = next
+      setText(next)
+      setFontSize(autoFittedSize(next, preferredFontSize.current, axisRef.current,
+        trackingRef.current, referenceRatioRef.current, stageWidthRef.current))
+      if (editing) {
+        requestAnimationFrame(() => {
+          if (input && document.activeElement === input) {
+            input.setSelectionRange(caret, caret)
+            setSelection({ start: caret, end: caret })
+          }
+        })
+      }
     }
     const onKeyboardDown = (event: KeyboardEvent) => {
       // On iPhone-sized screens, let the real focused textarea handle native
@@ -448,8 +511,8 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
     [layout, selection.start, selection.end],
   )
 
-  // Normal words retain FONT SIZE; only an individual word wider than the
-  // viewport gets a local fit adjustment. The whole composition never shrinks.
+  // All letters use the exact FONT SIZE reported by the slider. The line
+  // layout reflows; only an impossible single over-wide glyph is fitted.
   const factor = 1
   const contentMinHeight = Math.ceil(layout.height + 110)
 
@@ -504,6 +567,7 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
   }
 
   const reset = () => {
+    preferredFontSize.current = FONT_DEFAULTS.size
     setFontSize(FONT_DEFAULTS.size)
     setAxis(FONT_DEFAULTS.axis)
     setTracking(FONT_DEFAULTS.tracking)
@@ -517,7 +581,9 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
     const randomStep = (minimum: number, maximum: number, step: number) =>
       minimum + Math.floor(Math.random() * (Math.round((maximum - minimum) / step) + 1)) * step
     // Restrict RANDOM to usable print sizes and gentle spacing adjustments.
-    setFontSize(randomStep(72, 128, 2))
+    const nextSize = randomStep(72, 128, 2)
+    preferredFontSize.current = nextSize
+    setFontSize(nextSize)
     setAxis(randomStep(-60, 60, 5))
     setTracking(randomStep(-1, 1, 0.25))
     setLeading(randomStep(-0.75, 1, 0.25))
@@ -641,7 +707,11 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
           </div>
           <textarea ref={inputRef} className="font-keyboard-input" aria-label="Type A to Z, period, space, Backspace or Enter"
             value={text} onChange={(event) => {
-              setText(sanitizeText(event.target.value))
+              const nextText = sanitizeText(event.target.value)
+              currentText.current = nextText
+              setText(nextText)
+              setFontSize(autoFittedSize(nextText, preferredFontSize.current, axis,
+                tracking, referenceRatio, stageSize.width))
               const caret = event.target.selectionStart
               setSelection({ start: caret, end: event.target.selectionEnd })
             }}
@@ -708,7 +778,11 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
             <input type="range" aria-label="Font size" min="24" max="220" step="1" value={fontSize}
               style={{ '--fill-end': `${(fontSize - 24) / 196 * 100}%` } as CSSProperties}
               onPointerDown={beginSliderDrag} onPointerUp={endSliderDrag} onPointerCancel={endSliderDrag} onBlur={endSliderDrag}
-              onChange={(event) => setFontSize(snapToDefault(Number(event.target.value), FONT_DEFAULTS.size, 5))} />
+              onChange={(event) => {
+                const chosen = snapToDefault(Number(event.target.value), FONT_DEFAULTS.size, 5)
+                preferredFontSize.current = chosen
+                setFontSize(chosen)
+              }} />
             <small>24 — 220 PX</small>
           </label>
           <label className="rail-control font-tracking-control">
