@@ -71,13 +71,35 @@ function sanitizeText(raw: string): string {
   return raw.toUpperCase().replace(/\r\n?/g, '\n').replace(/[^A-Z. \n]/g, '').slice(0, 6000)
 }
 
-// Wrap at spaces. A word is never split in the middle, even if it has more
-// than 15 letters. Explicit Enter inserts a real line break.
+// Word-aware soft wrap. Keep the original text and character offsets intact:
+// soft wraps are visual only, while a user-entered Enter remains a hard break.
+// The 15-character limit counts visible glyphs (including periods); a single
+// unbroken word over 15 glyphs is kept whole rather than splitting a word.
 type IndexedChar = { char: string; index: number }
 type FontLine = { chars: IndexedChar[]; newlineIndex?: number }
-function splitIntoLines(text: string): FontLine[] {
+
+function measuredLineWidth(chars: IndexedChar[], glyphWidth: number, glyphGap: number, spaceAdvance: number): number {
+  let cursor = 0
+  let minX = 0
+  let maxX = 0
+  let previousWasGlyph = false
+  for (const { char } of chars) {
+    if (char !== ' ' && previousWasGlyph) cursor += glyphGap
+    const before = cursor
+    cursor += char === ' ' ? spaceAdvance : glyphWidth
+    minX = Math.min(minX, before)
+    maxX = Math.max(maxX, cursor)
+    previousWasGlyph = char !== ' '
+  }
+  return maxX - minX
+}
+
+function splitIntoLines(
+  text: string, maxLineWidth: number,
+  glyphWidth: number, glyphGap: number, spaceAdvance: number,
+): FontLine[] {
   const lines: FontLine[] = [{ chars: [] }]
-  let lineLetters = 0
+  let lineGlyphCount = 0
   let pendingSpaces: IndexedChar[] = []
   const tokens = /[A-Z.]+| +|\n/g
   for (const match of text.matchAll(tokens)) {
@@ -88,37 +110,58 @@ function splitIntoLines(text: string): FontLine[] {
       pendingSpaces = []
       lines[lines.length - 1].newlineIndex = index
       lines.push({ chars: [] })
-      lineLetters = 0
+      lineGlyphCount = 0
     } else if (token[0] === ' ') {
       pendingSpaces.push(...Array.from(token, (char, i) => ({ char, index: index + i })))
     } else {
-      const count = (token.match(/[A-Z]/g) || []).length
-      if (lineLetters > 0 && lineLetters + count > MAX_ALPHABETS_PER_LINE) {
-        // The separating spaces belong to the preceding line, without
-        // introducing an indent before the next word.
-        lines[lines.length - 1].chars.push(...pendingSpaces)
-        lines.push({ chars: [] })
-        lineLetters = 0
+      const word = Array.from(token, (char, i) => ({ char, index: index + i }))
+      const currentLine = lines[lines.length - 1]
+      const nextWidth = measuredLineWidth(
+        [...currentLine.chars, ...pendingSpaces, ...word], glyphWidth, glyphGap, spaceAdvance,
+      )
+      if (lineGlyphCount > 0 &&
+          (lineGlyphCount + word.length > MAX_ALPHABETS_PER_LINE || nextWidth > maxLineWidth)) {
+        // Spaces stay on the previous visual line, never indent the next word.
+        // Their source indexes remain available for caret/selection handling.
+        currentLine.chars.push(...pendingSpaces)
+        lines.push({ chars: [...word] })
+        lineGlyphCount = word.length
       } else {
-        lines[lines.length - 1].chars.push(...pendingSpaces)
+        currentLine.chars.push(...pendingSpaces, ...word)
+        lineGlyphCount += word.length
       }
       pendingSpaces = []
-      lines[lines.length - 1].chars.push(...Array.from(token, (char, i) => ({ char, index: index + i })))
-      lineLetters += count
     }
   }
   lines[lines.length - 1].chars.push(...pendingSpaces)
   return lines
 }
 
-function makeFontLayout(text: string, size: number, axis: number, tracking: number, leading: number, alignment: Alignment, baseRatio: number): FontLayout {
+function makeFontLayout(
+  text: string, size: number, axis: number, tracking: number, leading: number,
+  alignment: Alignment, baseRatio: number, stageWidth: number,
+): FontLayout {
   const nominalWidth = size * baseRatio
   const glyphWidth = nominalWidth * (axis < 0 ? 1 + Math.abs(axis) / 100 : 1)
   const glyphHeight = size * (axis > 0 ? 1 + axis / 100 : 1)
   const glyphGap = glyphWidth * TRACKING_RATIO * (1 + tracking)
   const spaceAdvance = glyphWidth * Math.max(0.02, SPACE_RATIO + TRACKING_RATIO * tracking)
   const lineGap = glyphHeight * LEADING_RATIO * (1 + leading)
-  const lines = splitIntoLines(text)
+
+  // Keep fontSize as the actual PNG drawing size. Previously, the full width
+  // of a long line was scaled down to fit the preview, making the FONT SIZE
+  // slider look ineffective for long text. Wrap between words first instead.
+  const availableWidth = Math.max(1, stageWidth - 64)
+  const glyphCount = (text.match(/[A-Z.]/g) ?? []).length
+  const spaceCount = (text.match(/ /g) ?? []).length
+  const estimatedAdvance = glyphCount * (glyphWidth + Math.max(0, glyphGap)) + spaceCount * spaceAdvance
+  // A compact, roughly landscape-rectangular text block is more readable than
+  // either one very long line or a tall single-word column. The optimal target
+  // adapts continuously to letter size, leading, and viewport width.
+  const idealBlockWidth = Math.sqrt(Math.max(1, estimatedAdvance) *
+    Math.max(glyphHeight, glyphHeight + lineGap) * 1.6)
+  const targetWidth = Math.min(availableWidth, Math.max(glyphWidth * 3, idealBlockWidth))
+  const lines = splitIntoLines(text, targetWidth, glyphWidth, glyphGap, spaceAdvance)
   const prepared = lines.map((line) => {
     let cursor = 0
     let previousWasGlyph = false
@@ -262,7 +305,10 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
     if (!node) return
     const measure = () => {
       const rect = node.getBoundingClientRect()
-      if (rect.width > 0 && rect.height > 0) setStageSize({ width: rect.width, height: rect.height })
+      if (rect.width > 0 && rect.height > 0) {
+        setStageSize((prior) => prior.width === rect.width && prior.height === rect.height
+          ? prior : { width: rect.width, height: rect.height })
+      }
     }
     measure()
     const resize = new ResizeObserver(measure)
@@ -383,21 +429,25 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
     }
   }, [active])
 
-  const layout = useMemo(() => makeFontLayout(text, fontSize, axis, tracking, leading, alignment, referenceRatio),
-    [text, fontSize, axis, tracking, leading, alignment, referenceRatio])
+  // Reflow using the real available preview width whenever the FONT SIZE,
+  // proportion, spacing, viewport size, or text changes. This is visual wrap:
+  // it does not insert extra Enter characters into the editable textarea.
+  const layout = useMemo(() => makeFontLayout(
+    text, fontSize, axis, tracking, leading, alignment, referenceRatio, stageSize.width,
+  ), [text, fontSize, axis, tracking, leading, alignment, referenceRatio, stageSize.width])
 
-  // Limit only by the available width. Long text should extend the stage
-  // vertically so the page can scroll instead of shrinking all glyphs.
   const selectionHighlights = useMemo(
     () => selectionRects(layout.characterBoxes, selection.start, selection.end),
     [layout, selection.start, selection.end],
   )
 
-  const factor = Math.max(0.01, Math.min(1,
-    // Keep the trailing caret visible even when tracking creates a larger gap.
-    (stageSize.width - 56) / Math.max(1, layout.width, layout.caretX + 4),
-  ))
-  const contentMinHeight = Math.ceil(layout.height * factor + 110)
+  // Never reduce the user's chosen FONT SIZE to fit the *whole* text. If an
+  // indivisible word is wider than the stage, allow horizontal scrolling for
+  // that exceptional line; otherwise word wrapping keeps everything in view.
+  // This also preserves the exact text size in PRINT output and on screen.
+  const factor = 1
+  const hasUnbreakableOverflow = Math.max(layout.width, layout.caretX + 4) > stageSize.width - 64
+  const contentMinHeight = Math.ceil(layout.height + 110)
 
   // The visible PNG composition and the hidden native textarea share the same
   // character offsets. Dragging across PNGs selects their underlying text.
@@ -567,7 +617,12 @@ export default function FontLab({ active, printBackground, onPrintBackgroundChan
       </aside>
       <div className="font-preview-column">
         <div ref={stageRef} className="font-preview-stage"
-          style={{ '--font-content-min-height': `${contentMinHeight}px` } as CSSProperties}
+          style={{
+            '--font-content-min-height': `${contentMinHeight}px`,
+            // Very long single words cannot soft-wrap without splitting them.
+            // Scroll just that oversized composition instead of shrinking PNGs.
+            ...(hasUnbreakableOverflow ? { overflowX: 'auto', justifyContent: 'flex-start' } : {}),
+          } as CSSProperties}
           onPointerDown={beginTextSelection}
           onPointerMove={moveTextSelection}
           onPointerUp={finishTextSelection}
